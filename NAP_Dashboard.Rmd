@@ -1,0 +1,247 @@
+---
+title: "NAP Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: row
+    vertical_layout: fill
+    source_code: embed
+    
+---
+
+```{r setup, include=FALSE,echo=FALSE}
+library(flexdashboard)
+```
+
+
+```{r, include=FALSE}
+library(RODBC)
+library(magrittr)
+napsdata<-odbcConnect("Open_NAPs_db")
+sqlTables(napsdata)
+country_codes_un<-sqlFetch(napsdata,"country_codes_un")
+nap_outputs<-sqlFetch(napsdata,"nap_output_docs")%>% na.omit(nap_outputs)
+Readiness<-sqlFetch(napsdata,"Readiness")
+GEF<-sqlFetch(napsdata,"GEF")%>% na.omit(GEF)
+GCF<-sqlFetch(napsdata,"GCF")%>% na.omit(GCF)
+NAPS<-sqlFetch(napsdata,"Submitted_NAPs")
+latlong<-sqlFetch(napsdata,"countrylatlong")
+NAPATbl<-sqlFetch(napsdata,"project_database")
+```
+
+
+```{r, include=FALSE}
+library(magrittr)
+napcountry_outputs<-merge(country_codes_un,nap_outputs, by="country-code")
+GEF_Projects<-merge(country_codes_un,GEF, by="countryname", all.y = TRUE)
+GCF_Projects<-merge(country_codes_un,GCF, by="countryname", all.y = TRUE)
+Country_Readiness<-merge(country_codes_un,Readiness, by="countryname", all.y = TRUE)
+NAPCountries<-merge(country_codes_un,NAPS, by="countryname", all.y = TRUE)
+xycountrycode<-merge(country_codes_un,latlong, by='countryname', all.x = TRUE)
+NAP_Countries<-merge(NAPS,xycountrycode, by="countryname", all.x = TRUE)
+NAPA<-merge(NAPATbl,xycountrycode, by="countryname", all.x = TRUE)
+```
+
+
+```{r,include=FALSE}
+
+library(dplyr)
+library(magrittr)
+GCF_Core <- as.data.frame(GCF_Projects)%>% group_by(`countryname`)%>% 
+  summarise("Total GCF Funding"=sum(`Total GCF Funding`))#%>%
+      #tidyr::pivot_wider(names_from = "countryname", values_from ="Total GCF Funding")
+GCF_Co_Finance <- as.data.frame(GCF_Projects)%>% group_by(`countryname`)%>% 
+  summarise("Total Co-Financing"=sum(`Total Co-Financing`))
+GEF_Grant <- as.data.frame(GEF_Projects)%>% group_by(`countryname`)%>% 
+  summarise("Grant"=sum(`Grant`))
+GEF_Co_Finance <- as.data.frame(GEF_Projects)%>% group_by(`countryname`)%>% 
+  summarise("Total Co-Financing"=sum(`Co-Financing`))
+Readiness_df <- as.data.frame(Country_Readiness)%>% group_by(`countryname`,Region,`Grant Agreement Type`)%>%   summarise("Amount Approved"=sum(`Amount Approved`),"Amount Disbursed"=sum(`Amount Disbursed`) )
+NAPA_df <- as.data.frame(NAPA)%>% group_by(`countryname`,Region,Fund,status)%>%   summarise("Amount Approved"=sum(Amount) )
+
+```
+Funding Overview
+=======================================================================
+Column { data-width=50 }
+-----------------------------------------------------------------------
+### GCF {.value-box}
+
+-----------------------------------------------------------------------
+
+
+
+```{r}
+gcf_total<-sum(GCF_Core$`Total GCF Funding`)
+
+valueBox(value = prettyNum(format(gcf_total,big.mark = ","), "", sep = ","),
+         caption = "Total GCF Funding", 
+         icon = "logo-usd", 
+         color = "brown")
+```
+
+
+### GEF {.value-box} 
+
+
+```{r}
+gef_total<-sum(GEF_Grant$Grant)
+
+valueBox(value = prettyNum(format(gef_total,big.mark = ","), "", sep = ","),
+         caption = "Total GEF Funding", 
+         icon = "logo-usd", 
+         color = "orange")
+```
+
+### NAPs {.value-box} 
+
+```{r}
+naps_total<-count(NAPS)
+
+valueBox(value = prettyNum(format(naps_total,big.mark = ","), "", sep = ","),
+         caption = "NAPs Submitted", 
+         icon = "document-text-outline", 
+         color = "green")
+```
+
+Column { data-width=50 }
+-----------------------------------------------------------------------
+
+```{r}
+library(ggplot2)
+library(treemapify)
+ggplot(data = GCF_Core, aes(fill=countryname, area=`Total GCF Funding`, label = paste(countryname,"\n",prettyNum(`Total GCF Funding`, big.mark = ","))))+
+  geom_treemap()+
+  geom_treemap_text(colour='black', place='centre')+
+  labs(subtitle = 'GCF Projects Funding by Country')+
+  theme(legend.position = 'none')
+```
+
+-----------------------------------------------------------------------
+
+```{r}
+library(ggplot2)
+library(treemapify)
+ggplot(data = subset(GEF_Grant,`Grant`>50000000), aes(fill=countryname, area=Grant, label = paste(countryname,"\n",prettyNum(Grant, big.mark = ","))))+
+  geom_treemap()+
+  geom_treemap_text(colour='black', place='centre')+
+  labs(subtitle = 'GEF Project Grants by Country')+
+  theme(legend.position = 'none')
+ 
+```
+
+
+Column { data-width=50 } 
+-----------------------------------------------------------------------
+
+```{r echo=FALSE}
+library(ggplot2)
+library(ggplotlyExtra)
+library(treemapify)
+ggplot(data = NAPA_df, aes(fill=countryname, area=NAPA_df$`Amount Approved`, label = paste(countryname,"\n",prettyNum(`Amount Approved`, big.mark = ","))))+
+  geom_treemap()+
+  geom_treemap_text(colour='black', place='centre')+
+  labs(subtitle = 'NAPA Funding by Country')+
+  theme(legend.position = 'none')
+```
+
+
+Readiness
+========================================================================
+
+### Projects by Region
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(plotly)
+library(dplyr)
+library(base)
+Country_Readiness %>% count(Country_Readiness$`Project Title`)%>%na.omit(Country_Readiness)%>%
+   plot_ly(type = "bar", 
+          y = Country_Readiness$`Project Title`, 
+          x = Country_Readiness$Region)
+```
+
+### Amount Approved by Country
+
+```{r,echo=FALSE}
+library(plotly)
+Readiness_df%>%arrange()%>%
+   plot_ly(type = "bar", 
+          x = Readiness_df$`Amount Approved`, 
+          y = Readiness_df$countryname
+
+                   )
+```
+
+```{r,echo=FALSE}
+#library(plotly)
+#Readiness_df %>% 
+ #  plot_ly(type = "bar", 
+  #        x = Readiness_df$`Amount Approved`, 
+   #       y = ~Region,
+    #      color = Readiness_df$`Grant Agreement Type` )
+
+```
+Outputs
+========================================================================
+
+### NAP Outputs
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+library(DT)
+library(rio)
+
+y<-napcountry_outputs[,c(2,5,7,12,11)]
+datatable(y,filter = 'top',fillContainer = T,rownames = F, editable = F, style = 'foundation', class = 'display responsive', width = '100%', caption = "NAP Output Documents", extensions = 'Buttons', options=list(initComplete = JS("function(settings, json) {$(this.api().table().header()).css({'font-size' : '70%'});}"),pageLength= 10, dom='lfrtipB', buttons = c('copy', 'csv', 'excel', 'pdf')))%>%
+  DT::formatStyle(columns = colnames(y),fontSize= '10px')
+
+```
+
+Map
+========================================================================
+
+### Countries with Submitted NAPs
+
+```{r,echo=FALSE}
+library(leaflet)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+NAP_Countries<-NAP_Countries%>%
+   mutate(popup_info=paste(countryname,"<br>","Submitted on:",NAP_Countries$`Date of submission`,"<br>","Link",NAP_Countries$Link))
+
+leaflet(NAP_Countries)%>%
+  addTiles()%>%
+  addCircleMarkers(data=NAP_Countries, fill=T,lng=~lon, lat =~lat, radius = ~4,popup =~popup_info)
+ 
+```
+
+Temperature Time-series
+========================================================================
+
+```{r, include=FALSE,echo=FALSE}
+#library(raster)
+#library(dygraphs)
+#temp<-getData('worldclim',var='tmean',res=2.5)
+#df<-as.data.frame(temp, xy=TRUE)
+#dygraph(df, main = "Wordclim Global Temperatures") %>%
+ # dyRangeSelector(dateWindow = c("2020-01-01", "2100-12-01"))
+```
+
+```{r,echo=FALSE}
+library(dygraphs)
+dygraph(nhtemp, main = "New Haven Temperatures") %>% 
+  dyRangeSelector(dateWindow = c("1920-01-01", "1980-12-01"))
+```
+
+About
+========================================================================
+### About
+
+_The Open NAPs Dashboard_
+
+Open NAPs are National Adaptation Plans for developing countries being developed through an open collaboration involving a wide range of actors, designed to support countries develop the best possible adaptation plans along the guidelines established by the UNFCCC Conference of Parties, and further elaborated through technical guidelines led by the LDC Expert Group (LEG), with continuing extension through supplements developed by a wide range of organizations.
+
+The Open NAP initiative is moderated by the LEG under the UNFCCC. For more information about the work of the LEG, visit [here](https://unfccc.int/LEG)
+
+For more information about the National Adaptation Plans, [browse here](https://napcentral.netlify.app/open-naps/)
+
+For any questions or feedback, [write to us](opennaps@naps.org)
