@@ -39,6 +39,7 @@ NAPCountries<-merge(country_codes_un,NAPS, by="countryname", all.y = TRUE)
 xycountrycode<-merge(country_codes_un,latlong, by='countryname', all.x = TRUE)
 NAP_Countries<-merge(NAPS,xycountrycode, by="countryname", all.x = TRUE)
 NAPA<-merge(NAPATbl,xycountrycode, by="countryname", all.x = TRUE)
+
 ```
 
 
@@ -57,7 +58,7 @@ GEF_Co_Finance <- as.data.frame(GEF_Projects)%>% group_by(`countryname`)%>%
   summarise("Total Co-Financing"=sum(`Co-Financing`))
 Readiness_df <- as.data.frame(Country_Readiness)%>% group_by(`countryname`,Region,`Grant Agreement Type`)%>%   summarise("Amount Approved"=sum(`Amount Approved`),"Amount Disbursed"=sum(`Amount Disbursed`) )
 NAPA_df <- as.data.frame(NAPA)%>% group_by(`countryname`,Region,Fund,status)%>%   summarise("Amount Approved"=sum(Amount) )
-
+NAPA_New<-NAPA_df[-90,]
 ```
 Funding Overview
 =======================================================================
@@ -171,15 +172,6 @@ Readiness_df%>%arrange()%>%
                    )
 ```
 
-```{r,echo=FALSE}
-#library(plotly)
-#Readiness_df %>% 
- #  plot_ly(type = "bar", 
-  #        x = Readiness_df$`Amount Approved`, 
-   #       y = ~Region,
-    #      color = Readiness_df$`Grant Agreement Type` )
-
-```
 Outputs
 ========================================================================
 
@@ -218,23 +210,99 @@ Temperature Time-series
 ========================================================================
 
 ```{r, include=FALSE,echo=FALSE}
-#library(raster)
-#library(dygraphs)
-#temp<-getData('worldclim',var='tmean',res=2.5)
-#df<-as.data.frame(temp, xy=TRUE)
-#dygraph(df, main = "Wordclim Global Temperatures") %>%
- # dyRangeSelector(dateWindow = c("2020-01-01", "2100-12-01"))
+library(rgee)
+library(raster)
+ee_Initialize()
+Tmax<-ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE")$
+  select('tmmx')
+
+library(sf)
+Tru<-read_sf("C:/Workspace/RMardown_NAPS/Africa_Trace.shp")
+
+TmaxAfrica<-ee_extract(x=Tmax, y=Tru, fun=ee$Reducer$mean())
+
+library(tidyverse)
+Tmaxlong<-pivot_longer(TmaxAfrica,everything(),names_to = 'month',values_to = 'tmax')
+Date<-seq(as.Date('1958-01-01'), by="month", length.out=757)
+Tmaxlong$Date<-Date
+ 
+library(lubridate)
+tmax_ann<-Tmaxlong%>%mutate(year=year(Date), month=month(Date))%>%
+  group_by(year)%>%  summarise(tmax=sum(tmax))
+
+library(xts)
+tmax_ts<-xts(Tmaxlong$tmax,Tmaxlong$Date)
 ```
 
-```{r,echo=FALSE}
+-----------------------------------------------------------------------
+
+### 
+
+```{r}
 library(dygraphs)
-dygraph(nhtemp, main = "New Haven Temperatures") %>% 
-  dyRangeSelector(dateWindow = c("1920-01-01", "1980-12-01"))
+dygraph(tmax_ts, main = "Monthly Temperature Time Series") %>% 
+  dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
+```
+
+-----------------------------------------------------------------------
+
+### 
+
+```{r}
+library(dygraphs)
+dygraph(tmax_ann, main = "Annual Temperature Time Series") %>% 
+  dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
+```
+
+Precipitation Time-series
+========================================================================
+
+```{r echo=FALSE, include=FALSE}
+library(rgee)
+library(raster)
+ee_Initialize()
+pr<-ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE")$select('pr')
+
+library(sf)
+Tru<-read_sf("C:/Workspace/RMardown_NAPS/Africa_Trace.shp")
+
+prAfrica<-ee_extract(x=pr, y=Tru, fun=ee$Reducer$mean())
+
+library(tidyverse)
+prlong<-pivot_longer(prAfrica,everything(),names_to = 'month',values_to = 'pr')
+ Date<-seq(as.Date('1958-01-01'), by="month", length.out=757)
+prlong$Date<-Date 
+
+library(lubridate)
+pr_ann<-prlong%>%mutate(year=year(Date), month=month(Date))%>%
+  group_by(year)%>%
+  summarise(pr=sum(pr))
+
+library(xts)
+pr_ts<-xts(prlong$pr,prlong$Date)
+```
+
+-----------------------------------------------------------------------
+
+###
+```{r}
+library(dygraphs)
+dygraph(pr_ts, main = "Monthly Time Series") %>% 
+  dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
+```
+
+-----------------------------------------------------------------------
+
+###
+```{r}
+library(dygraphs)
+dygraph(pr_ann, main = "Annual Time Series") %>% 
+  dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
 ```
 
 About
 ========================================================================
-### About
+
 
 _The Open NAPs Dashboard_
 
