@@ -209,10 +209,12 @@ leaflet(NAP_Countries)%>%
 
 Climate {data-orientation=columns}
 ========================================================================
+Climate data trends for Africa. Data set: [Terraclimate](https://developers.google.com/earth-engine/datasets/catalog/IDAHO_EPSCOR_TERRACLIMATE)
+
  {.tabset .tabset-fade}
 -------------------------------------
 
-```{r global, include=FALSE,echo=FALSE}
+```{r, include=FALSE,echo=FALSE}
 library(rgee)
 library(raster)
 ee_Initialize()
@@ -238,7 +240,7 @@ tmax_ts<-xts(Tmaxlong$tmax,Tmaxlong$Date)
 ```
 
 
-### Temepearture - Monthly
+### Temperature - Monthly
 
 ```{r}
 library(dygraphs)
@@ -247,7 +249,7 @@ dygraph(tmax_ts, main = "Monthly Temperature Time Series") %>%
 ```
 
 
-### Temepearture - Annual 
+### Temperature - Annual 
 
 ```{r}
 library(dygraphs)
@@ -293,10 +295,112 @@ dygraph(pr_ts, main = "Monthly Time Series") %>%
 
 
 ### Precipitation - Annual
+
 ```{r}
 library(dygraphs)
 dygraph(pr_ann, main = "Annual Time Series") %>% 
   dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
+```
+
+Agriculture {data-orientation=rows}
+========================================================================
+Agricultural Productivity for selected crops. 
+Data source: [FAOSTAT](http://www.fao.org/faostat/en/#data) 
+
+```{r, echo=FALSE}
+library(FAOSTAT)
+data_folder <- "FAOSTATs"
+dir.create(data_folder)
+production_crops <- get_faostat_bulk(code = "QC", data_folder = data_folder)
+#saveRDS(production_crops, "FAOSTATs/production_crops_e_all_data.rds")
+#production_crops <- readRDS("FAOSTATs/production_crops_e_all_data.rds")
+```
+Row 
+--------------------------------------------------------------------------
+### Crop Yield
+
+```{r, echo=FALSE}
+library(dplyr)
+library(xts)
+library(magrittr)
+library(timeSeries)
+library(dygraphs)
+selectcrops<-production_crops%>% na.omit()%>%group_by(item,element,year)%>%
+  summarise(value=sum(value))%>%
+  dplyr::filter(element=="Yield")%>%dplyr::filter(item=="Maize" | item=="Yams" |item=="Apples"|item=="Avocados"|item=="Bananas"|item=="Barley"|item=="Beans,green"|item=="Beans,dry"|item=="Cassava"|item=="Cereals,Total"|item=="Dates"|item=="Onions, dry"|item=="Lentils"|item=="Millet"|item=="Oats"|item=="Olives"|item=="Oil palm fruit"|item=="Potoatoes"|item=="Pulses,Total"|item=="Rice,paddy"|item=="Sorghum"|item=="Soybeans"|item=="Tea"|item=="Tomatoes"|item=="Vegetables Primary"|item=="Wheat")
+
+library(ggplot2)
+xcrop<- ggplot2::ggplot(selectcrops,aes(x=year, y=value, color=item))+
+  ggtitle('Global Crop Yield - Annual Trends')+
+  xlab('Time')+ylab('Yield (hg/ha)')+
+  geom_line()+ 
+  theme_minimal()
+plotly::ggplotly(xcrop)
+```
+
+### Total Crop Production
+
+```{r}
+library(dplyr)
+library(xts)
+library(magrittr)
+library(timeSeries)
+library(dygraphs)
+production<-production_crops%>% na.omit()%>%group_by(item,element,year)%>%
+  summarise(value=sum(value))%>%
+  dplyr::filter(element=="Production")%>%dplyr::filter(item=="Maize" | item=="Yams" |item=="Apples"|item=="Avocados"|item=="Bananas"|item=="Barley"|item=="Beans,green"|item=="Beans,dry"|item=="Cassava"|item=="Cereals,Total"|item=="Dates"|item=="Onions, dry"|item=="Lentils"|item=="Millet"|item=="Oats"|item=="Olives"|item=="Oil palm fruit"|item=="Potoatoes"|item=="Pulses,Total"|item=="Rice,paddy"|item=="Sorghum"|item=="Soybeans"|item=="Tea"|item=="Tomatoes"|item=="Vegetables Primary"|item=="Wheat")
+
+library(ggplot2)
+xprod<- ggplot2::ggplot(production,aes(x=year, y=value, color=item))+
+  ggtitle('Global Crop Production - Annual Trends')+
+  xlab('Time')+ylab('Tonnes')+
+  geom_line()+ 
+  theme_minimal()
+plotly::ggplotly(xprod)
+```
+
+Row
+-----------------------------------------------------------------
+### Area harvested
+
+```{r}
+library(dplyr)
+library(xts)
+library(magrittr)
+library(timeSeries)
+library(dygraphs)
+Area_harvested<-production_crops%>%na.omit()%>% group_by(item,element,year)%>%
+  summarise(value=sum(value))%>%
+  dplyr::filter(element=="Area harvested")%>%dplyr::filter(item=="Maize" | item=="Yams" |item=="Apples"|item=="Avocados"|item=="Bananas"|item=="Barley"|item=="Beans,green"|item=="Beans,dry"|item=="Cassava"|item=="Cereals,Total"|item=="Dates"|item=="Onions, dry"|item=="Lentils"|item=="Millet"|item=="Oats"|item=="Olives"|item=="Oil palm fruit"|item=="Potoatoes"|item=="Pulses,Total"|item=="Rice,paddy"|item=="Sorghum"|item=="Soybeans"|item=="Tea"|item=="Tomatoes"|item=="Vegetables Primary"|item=="Wheat")
+
+library(ggplot2)
+area<- ggplot2::ggplot(Area_harvested,aes(x=year, y=value, color=item))+
+  ggtitle('Annual Global Crop Trends - Area Harvested')+
+  xlab('Time')+ylab('Area harvested (ha)')+
+  geom_line()+ 
+  theme_minimal()
+plotly::ggplotly(area)
+```
+
+### Maize Crop Production
+
+```{r, echo=FALSE}
+library(dplyr)
+library(xts)
+library(magrittr)
+library(timeSeries)
+library(dygraphs)
+Maize<-production_crops%>% na.omit()%>%group_by(item,element,year)%>%
+  summarise(value=sum(value))%>%
+  dplyr::filter(item=="Maize")
+
+library(ggplot2)
+Maizecrop<- ggplot2::ggplot(Maize,aes(x=year, y=value, color=element))+
+  ggtitle('Global Maize Production Trends')+
+  xlab('Time')+ylab('value')+
+  geom_line()+ 
+  theme_minimal()
+plotly::ggplotly(Maizecrop)
 ```
 
 About
