@@ -2,7 +2,7 @@
 title: "NAP Dashboard"
 output: 
   flexdashboard::flex_dashboard:
-    orientation: row
+    orientation: rows
     vertical_layout: fill
     source_code: embed
     
@@ -13,7 +13,7 @@ library(flexdashboard)
 ```
 
 
-```{r, include=FALSE}
+```{r global, include=FALSE}
 library(RODBC)
 library(magrittr)
 napsdata<-odbcConnect("Open_NAPs_db")
@@ -142,6 +142,7 @@ ggplot(data = NAPA_df, aes(fill=countryname, area=NAPA_df$`Amount Approved`, lab
   geom_treemap_text(colour='black', place='centre')+
   labs(subtitle = 'NAPA Funding by Country')+
   theme(legend.position = 'none')
+#ggplotly(x)
 ```
 
 
@@ -206,10 +207,12 @@ leaflet(NAP_Countries)%>%
  
 ```
 
-Temperature Time-series
+Climate {data-orientation=columns}
 ========================================================================
+ {.tabset .tabset-fade}
+-------------------------------------
 
-```{r, include=FALSE,echo=FALSE}
+```{r global, include=FALSE,echo=FALSE}
 library(rgee)
 library(raster)
 ee_Initialize()
@@ -234,9 +237,8 @@ library(xts)
 tmax_ts<-xts(Tmaxlong$tmax,Tmaxlong$Date)
 ```
 
------------------------------------------------------------------------
 
-### 
+### Temepearture - Monthly
 
 ```{r}
 library(dygraphs)
@@ -244,9 +246,8 @@ dygraph(tmax_ts, main = "Monthly Temperature Time Series") %>%
   dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
 ```
 
------------------------------------------------------------------------
 
-### 
+### Temepearture - Annual 
 
 ```{r}
 library(dygraphs)
@@ -254,8 +255,8 @@ dygraph(tmax_ann, main = "Annual Temperature Time Series") %>%
   dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
 ```
 
-Precipitation Time-series
-========================================================================
+ {.tabset }
+--------------------------------------------------------------
 
 ```{r echo=FALSE, include=FALSE}
 library(rgee)
@@ -282,18 +283,16 @@ library(xts)
 pr_ts<-xts(prlong$pr,prlong$Date)
 ```
 
------------------------------------------------------------------------
 
-###
+### Precipitation - Monthly
 ```{r}
 library(dygraphs)
 dygraph(pr_ts, main = "Monthly Time Series") %>% 
   dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
 ```
 
------------------------------------------------------------------------
 
-###
+### Precipitation - Annual
 ```{r}
 library(dygraphs)
 dygraph(pr_ann, main = "Annual Time Series") %>% 
