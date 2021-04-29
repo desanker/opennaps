@@ -223,7 +223,7 @@ library(sf)
 Africa_Trace<-read_sf("C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Africa_Trace.shp")  
 #need to reconfigure this path to your workspace
 
-TmaxAfrica<-ee_extract(x=Tmax, y=Africa_geom, fun=ee$Reducer$mean())
+TmaxAfrica<-ee_extract(x=Tmax, y=Africa_Trace, fun=ee$Reducer$mean())
 
 library(tidyverse)
 Tmaxlong<-pivot_longer(TmaxAfrica,everything(),names_to = 'month',values_to = 'tmax')
@@ -267,7 +267,7 @@ pr<-ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE")$select('pr')
 library(sf) 
 Africa_Trace<-read_sf("C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Africa_Trace.shp")
 
-prAfrica<-ee_extract(x=pr, y=Africa_geom, fun=ee$Reducer$mean())
+prAfrica<-ee_extract(x=pr, y=Africa_Trace, fun=ee$Reducer$mean())
 
 library(tidyverse)
 prlong<-pivot_longer(prAfrica,everything(),names_to = 'month',values_to = 'pr')
