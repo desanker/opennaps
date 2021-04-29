@@ -220,7 +220,7 @@ Tmax<-ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE")$
   select('tmmx')
 
 library(sf)
-Africa_geom<-read_sf("C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Africa_Trace.shp")  
+Africa_Trace<-read_sf("C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Africa_Trace.shp")  
 #need to reconfigure this path to your workspace
 
 TmaxAfrica<-ee_extract(x=Tmax, y=Africa_geom, fun=ee$Reducer$mean())
@@ -265,7 +265,7 @@ ee_Initialize()
 pr<-ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE")$select('pr')
 
 library(sf) 
-Africa_geom<-read_sf("C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Africa_Trace.shp")
+Africa_Trace<-read_sf("C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Africa_Trace.shp")
 
 prAfrica<-ee_extract(x=pr, y=Africa_geom, fun=ee$Reducer$mean())
 
