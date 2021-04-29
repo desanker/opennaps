@@ -14,18 +14,16 @@ library(flexdashboard)
 
 
 ```{r global, include=FALSE}
-library(RODBC)
-library(magrittr)
-napsdata<-odbcConnect("Open_NAPs_db")
-sqlTables(napsdata)
-country_codes_un<-sqlFetch(napsdata,"country_codes_un")
-nap_outputs<-sqlFetch(napsdata,"nap_output_docs")%>% na.omit(nap_outputs)
-Readiness<-sqlFetch(napsdata,"Readiness")
-GEF<-sqlFetch(napsdata,"GEF")%>% na.omit(GEF)
-GCF<-sqlFetch(napsdata,"GCF")%>% na.omit(GCF)
-NAPS<-sqlFetch(napsdata,"Submitted_NAPs")
-latlong<-sqlFetch(napsdata,"countrylatlong")
-NAPATbl<-sqlFetch(napsdata,"project_database")
+library(readxl)
+library(magrittr)   
+country_codes_un <- read_excel("Open_NAPs_Database.xlsx",sheet = "country_codes_un")
+nap_outputs <- read_excel("Open_NAPs_Database.xlsx",sheet = "nap_output_docs")
+Readiness<- read_excel("Open_NAPs_Database.xlsx",sheet = "Readiness")
+GEF <- read_excel("Open_NAPs_Database.xlsx",sheet = "GEF")%>%na.omit()
+GCF <- read_excel("Open_NAPs_Database.xlsx",sheet = "GCF")%>%na.omit(GCF)
+NAPS <- read_excel("Open_NAPs_Database.xlsx",sheet = "Submitted_NAPs")
+latlong <- read_excel("Open_NAPs_Database.xlsx",sheet = "countrylatlong")
+NAPATbl <- read_excel("Open_NAPs_Database.xlsx",sheet = "project_database")
 ```
 
 
@@ -97,7 +95,7 @@ valueBox(value = prettyNum(format(gef_total,big.mark = ","), "", sep = ","),
 ```{r}
 naps_total<-count(NAPS)
 
-valueBox(value = prettyNum(format(naps_total,big.mark = ","), "", sep = ","),
+valueBox(naps_total,
          caption = "NAPs Submitted", 
          icon = "document-text-outline", 
          color = "green")
@@ -209,10 +207,10 @@ leaflet(NAP_Countries)%>%
 
 Climate {data-orientation=columns}
 ========================================================================
-Climate data trends for Africa. Data set: [Terraclimate](https://developers.google.com/earth-engine/datasets/catalog/IDAHO_EPSCOR_TERRACLIMATE)
 
  {.tabset .tabset-fade}
 -------------------------------------
+Climate data trends for Africa. Data set: [Terraclimate](https://developers.google.com/earth-engine/datasets/catalog/IDAHO_EPSCOR_TERRACLIMATE)
 
 ```{r, include=FALSE,echo=FALSE}
 library(rgee)
@@ -222,9 +220,10 @@ Tmax<-ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE")$
   select('tmmx')
 
 library(sf)
-Tru<-read_sf("C:/Workspace/RMardown_NAPS/Africa_Trace.shp")
+Africa_geom<-read_sf("C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Africa_Trace.shp")  
+#need to reconfigure this path to your workspace
 
-TmaxAfrica<-ee_extract(x=Tmax, y=Tru, fun=ee$Reducer$mean())
+TmaxAfrica<-ee_extract(x=Tmax, y=Africa_geom, fun=ee$Reducer$mean())
 
 library(tidyverse)
 Tmaxlong<-pivot_longer(TmaxAfrica,everything(),names_to = 'month',values_to = 'tmax')
@@ -257,8 +256,7 @@ dygraph(tmax_ann, main = "Annual Temperature Time Series") %>%
   dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
 ```
 
- {.tabset }
---------------------------------------------------------------
+-------------------------------------
 
 ```{r echo=FALSE, include=FALSE}
 library(rgee)
@@ -266,10 +264,10 @@ library(raster)
 ee_Initialize()
 pr<-ee$ImageCollection("IDAHO_EPSCOR/TERRACLIMATE")$select('pr')
 
-library(sf)
-Tru<-read_sf("C:/Workspace/RMardown_NAPS/Africa_Trace.shp")
+library(sf) 
+Africa_geom<-read_sf("C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Africa_Trace.shp")
 
-prAfrica<-ee_extract(x=pr, y=Tru, fun=ee$Reducer$mean())
+prAfrica<-ee_extract(x=pr, y=Africa_geom, fun=ee$Reducer$mean())
 
 library(tidyverse)
 prlong<-pivot_longer(prAfrica,everything(),names_to = 'month',values_to = 'pr')
@@ -300,6 +298,68 @@ dygraph(pr_ts, main = "Monthly Time Series") %>%
 library(dygraphs)
 dygraph(pr_ann, main = "Annual Time Series") %>% 
   dyRangeSelector(dateWindow = c("1958-01-01", "2020-12-01"))
+```
+
+ {.tabset }
+--------------------------------------------------------------
+Global Emission Trends. Data set: [WorldBank](https://data.worldbank.org/indicator)
+
+### Co2 Emissions
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(wbstats)
+ind<-wb_indicators()
+co2<-wb_data("EN.ATM.CO2E.KT",return_wide = FALSE)
+wbplot<- ggplot2::ggplot(co2,aes(x=date, y=value, color=country))+
+  ggtitle('Co2 Emissions')+
+  xlab('Time')+ylab('value (kt)')+
+  geom_line()+
+  theme(legend.position = "none")
+plotly::ggplotly(wbplot)
+```
+
+### GHG Emissions
+
+```{r}
+library(dplyr)
+library(ggplot2)
+GHG<-wb_data("EN.ATM.GHGT.KT.CE",return_wide = FALSE,start_date = 1970,end_date = 2012)
+wbplot<- ggplot2::ggplot(GHG,aes(x=date, y=value, color=country))+
+  ggtitle('GHG Emissions- kt of CO2 equivalent')+
+  xlab('Time')+ylab('value')+
+  geom_line()+
+  theme(legend.position="none")
+plotly::ggplotly(wbplot)
+```
+
+### Emmissions per ppp$GDP
+
+```{r}
+library(dplyr)
+library(ggplot2)
+co2pppgdp<-wb_data("EN.ATM.CO2E.PP.GD",return_wide = FALSE,start_date = 1990,end_date = 2016)
+wbplot<- ggplot2::ggplot(co2pppgdp,aes(x=date, y=value, color=country))+
+  ggtitle('CO2 emissions (kg per PPP $ of GDP)')+
+  xlab('Time')+ylab('value (kg)')+
+  geom_line()+
+  theme(legend.position = "none")
+plotly::ggplotly(wbplot)
+```
+
+### Emmissions (metric tons per capita)
+
+```{r}
+library(dplyr)
+library(ggplot2)
+co2mtcapita<-wb_data("EN.ATM.CO2E.PC",return_wide = FALSE,start_date = 1960,end_date = 2016)
+wbplot<- ggplot2::ggplot(co2mtcapita,aes(x=date, y=value, color=country))+
+  ggtitle('CO2 emissions (metric tons per capita)')+
+  xlab('Time')+ylab('value (metric tons)')+
+  geom_line()+
+  theme(legend.position = "none")
+plotly::ggplotly(wbplot)
 ```
 
 Agriculture {data-orientation=rows}

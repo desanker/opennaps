@@ -13,5 +13,5 @@ RnwWeave: Sweave
 LaTeX: pdfLaTeX
 
 PythonType: conda
-PythonVersion: 3.6.13
-PythonPath: C:\Users\User\AppData\Local\r-miniconda\envs\r-reticulate\python.exe
+PythonVersion: 3.9.2
+PythonPath: C:\Users\User\AppData\Local\r-miniconda\envs\rgee\python.exe
