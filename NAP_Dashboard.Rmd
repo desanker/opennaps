@@ -25,6 +25,7 @@ NAPS <- read_excel("Open_NAPs_Database.xlsx",sheet = "Submitted_NAPs")
 latlong <- read_excel("Open_NAPs_Database.xlsx",sheet = "countrylatlong")
 NAPATbl <- read_excel("Open_NAPs_Database.xlsx",sheet = "project_database")
 policy_db<-read_excel("Open_NAPs_Database.xlsx",sheet = "Policy_db")
+Measures<-read_excel("Open_NAPs_Database.xlsx",sheet = "Measures")
 ```
 
 
@@ -142,7 +143,7 @@ ggplot(data = NAPA_df, aes(fill=countryname, area=NAPA_df$`Amount Approved`, lab
   geom_treemap_text(colour='black', place='centre')+
   labs(subtitle = 'NAPA Funding by Country')+
   theme(legend.position = 'none')
-#ggplotly(x)
+
 ```
 
 
@@ -155,10 +156,10 @@ Readiness
 library(plotly)
 library(dplyr)
 library(base)
-Country_Readiness %>% count(Country_Readiness$`Project Title`)%>%na.omit(Country_Readiness)%>%
+Country_Readiness %>% group_by(Region)%>%count(`Request ID`)%>%
    plot_ly(type = "bar", 
-          y = Country_Readiness$`Project Title`, 
-          x = Country_Readiness$Region)
+          y = ~n, 
+          x =~Region)
 ```
 
 ### Amount Approved by Country
@@ -199,6 +200,29 @@ p<-policy[,c(3,4,6,7)]
 datatable(p,filter = 'top',fillContainer = T,rownames = F, editable = F, style = 'jqueryui', class = 'display responsive', width = '100%', caption = "Policy Doduments", extensions = 'Buttons', options=list(initComplete = JS("function(settings, json) {$(this.api().table().header()).css({'font-size' : '70%'});}"),pageLength= 10, dom='lfrtipB', buttons = c('copy', 'csv', 'excel', 'pdf')))%>%
   DT::formatStyle(columns = colnames(p),fontSize= '12px')
 
+```
+
+### Measures to formulate NAPS
+
+```{R}
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(reshape)
+
+m_columns<-Measures[,-1]
+
+m<-as.data.frame(m_columns)
+measures_df <- reshape::melt(m, id.vars = "Measures")
+
+mplot<- ggplot(measures_df, aes(x = paste(substr(Measures, 1,40), '...') , y = value, fill = variable)) + 
+    geom_bar(stat = 'identity',position="stack") + 
+    ggtitle('Measures undertaken in developing country Parties in the process to formulate and implement national adaptation plans as at 24 February 2021') + 
+    xlab('Measure') + 
+    ylab('No. of countries') + 
+    coord_flip() + 
+     theme_classic()
+plotly::ggplotly(mplot)
 ```
 
 Maps 
