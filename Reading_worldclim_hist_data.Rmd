@@ -1,0 +1,191 @@
+---
+title: "Pr_worldclim_2010_18"
+author: "Kami Makabe"
+date: "4/12/2021"
+output: html_document
+---
+```{r setup, include=FALSE,message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### register the path to your data directory
+```{r}
+prpath<-"C:/Workspace/RMardown_NAPS/Testrun1/Open-Naps_Test1/wc2-5/Precipitation/wc2.1_2.5m_prec_2010-2018 - Copy"
+```
+
+
+### load tif files only
+
+```{r}
+library(raster)
+pr_tif_only<-list.files(prpath,full.names = TRUE, pattern = ".tif$")
+```
+
+
+## stack .tif files (108)
+
+```{r}
+library(raster)
+prstack<-stack(pr_tif_only)
+```
+
+### Get Malawi geom, source: natural earth.org
+
+```{r, echo=FALSE}
+library(rnaturalearth)
+malawi<-rnaturalearth::ne_countries(country ='malawi', returnclass='sf')
+```
+
+
+### crop for area of interest
+
+```{r,echo=FALSE, message=FALSE, warning=FALSE}
+library(raster)
+
+wcprmalawi<-crop(prstack,extent(malawi)) ## here you can use your shapefile from previous step or get the bounding coordinates from any map service and enter them in the order (west, east, south, north)
+wcprmalawim<-mask(wcprmalawi,malawi)
+plot(wcprmalawim)  # remove the '#' sign to plot the individual stacked .tifs
+```
+
+
+### calculate monthly mean ppt for entire period of dataset
+
+```{r}
+pr_mon_mean<-stackApply(wcprmalawim,1:12,mean)
+```
+
+
+### assign names to layers & plot Monlthy mean ppt rasters
+
+```{r}
+names(pr_mon_mean)<-month.name
+plot(pr_mon_mean)
+```
+
+
+## convert stack to data frame
+
+```{r}
+library(raster)
+library(reshape)
+library(dplyr)
+prdf<-as.data.frame(pr_mon_mean, xy=TRUE)%>%
+  melt(id.vars=c('x','y'))
+
+```
+
+
+### plot geom raster
+
+```{r}
+library(ggplot2)
+library(raster)
+ggplot()+
+  geom_raster(data=prdf, aes(x=x, y=y, fill=value))+
+  facet_wrap(~variable)+
+  geom_sf(fill='transparent', data = malawi)+
+  scale_fill_viridis_c(name='mm', direction = -1)+
+  xlab('Longitude')+ylab('Latitude')+ ggtitle('Mean Monthly Precipitation')+
+  theme_bw()
+  
+```
+
+
+### select and plot single month
+
+```{r}
+library(raster)
+library(reshape)
+library(ggplot2)
+xmonthdf<-as.data.frame(pr_mon_mean[[06]], xy=TRUE, stringsAsFactors=FALSE)%>%
+  melt(id.vars=c('x','y'))
+ggplot()+
+  geom_raster(data=xmonthdf, aes(x=x, y=y, fill=value))+
+  xlab('Longitude')+ylab('Latitude')+
+  geom_sf(fill='transparent', data = malawi)+
+  scale_fill_viridis_c(name='mm')+
+  ggtitle('Monthly Precipitation')+
+  theme_bw()
+  
+```
+
+### including other plots
+
+#### first prepare the raw raster data as data frame
+
+```{r}
+library(reshape)
+stdf_pr<-as.data.frame(wcprmalawim,xy=TRUE, na.rm=TRUE, stringsAsFactors=FALSE)%>%
+  melt(id.vars=c('x','y'))
+```
+## then extract and format the date values into as.date
+
+```{r}
+Dt<-stdf_pr$variable
+substr(Dt[1],2,5)
+substr(Dt[1],7,8)
+paste(substr(Dt,2,5),substr(Dt,7,8),'01', sep = "-")
+prdfdate<-as.Date(paste(substr(Dt,2,5),substr(Dt,7,8),'01', sep = "-"))
+
+```
+
+#### add proper date column to your dataframe
+
+```{r}
+library(lubridate)
+stdf_date<-stdf_pr # created a copy of the df just as extra caution
+Date<-prdfdate # a copy of the date values as extra caution too
+stdfpr_dt<-cbind(stdf_date,Date)
+```
+### add Month and year columns
+
+```{r}
+Year<-substr(Dt,2,5)
+Month<-substr(Dt,7,8)
+stdf_pr<-cbind(stdfpr_dt, Year, Month)
+```
+
+
+### rename column 'value' to 'pr'
+
+```{r}
+colnames(stdf_pr)[colnames(stdf_pr)=="value"]<-"pr"
+```
+
+```{r}
+library(ggplot2)
+ggplot(stdf_pr, aes(Date,pr))+
+  geom_line(col='blue')+
+  xlab('Time')+ylab('pr (mm)')+
+  ggtitle('Monthly Precipitation')+
+  theme_bw()
+
+```
+
+### monthly mean time series
+ 
+```{r}
+prmonthdat<-stdf_pr%>% group_by(Month)%>% 
+  summarise(across(contains("pr"), ~mean(pr, na.rm=TRUE)))
+tsprmon<- ts(prmonthdat$pr)
+plot(tsprmon)
+```
+
+### annual mean time series
+
+```{r}
+
+pranndat<-stdf_pr%>% group_by(Year)%>% 
+  summarise(across(contains("pr"), ~mean(pr, na.rm=TRUE)))
+tsprann<- ts(pranndat$pr, start = c(2010, 06), end=c(2018, 12), frequency = 1)
+plot(tsprann)
+```
+
+### export df as csv (or other file type)
+#```{r}  ## remove the '#' in the beginning of line to run code
+library(readr)
+csvpath <- "prpath"
+csvname <- "wc10_18_ppt.csv"
+csvfile <- paste(csvpath, csvname, sep="")
+write.table(na.omit(stdf_pr),csvfile, row.names=FALSE, sep=",")
+```
