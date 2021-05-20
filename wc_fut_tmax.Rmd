@@ -1,0 +1,217 @@
+---
+title: "Download and plot worldclim scenario data  tmax"
+author: "Kami Makabe"
+date: "5/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message = FALSE, warning = FALSE)
+```
+
+### Load required libraries
+If using r for the first time, you need to install the respective packages fisrt.
+The package names as similar to the libraries.
+
+```{r}
+library(raster)
+library(magrittr)
+library(rnaturalearth)
+library(dplyr)
+library(reshape)
+library(ggplot2)
+library(ggeasy)
+library(stringr)
+```
+
+### Prepare your data
+We will need to manually download our scenario data from [worldclim](https://worldclim.org/data/cmip6/cmip6climate.html), and store it locally.
+Alternatively, use direct download for example 'ssp126_40url<- "https://biogeo.ucdavis.edu/data/worldclim/v2.1/fut/2.5m/wc2.1_2.5m_prec_BCC-CSM2-MR_ssp126_2021-2040.zip"
+download.file(ssp126_40url, destfile="wc2.1_2.5m_prec_BCC-CSM2-MR_ssp126_2021-2040.zip")
+unzip("wc2.1_2.5m_prec_BCC-CSM2-MR_ssp126_2021-2040.zip")'
+
+Set the path to your downloaded files
+```{r}
+path126<-"C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/WC_Fut_data/tmax126"
+path245<-"C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/WC_Fut_data/tmax245"
+path370<-"C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/WC_Fut_data/tmax370"
+path585<-"C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/WC_Fut_data/tmax585"
+```
+
+### Import files into r
+Then load the files into your r environment. 
+As a tip, since we already know our data is in .tif format, we will give r the instructions to only load files with the .tif extension. This works well, incase you use the directory for other file types.
+
+```{r}
+tx126_tif_only<-list.files(path126,full.names = TRUE, pattern = ".tif$")
+tx245_tif_only<-list.files(path245,full.names = TRUE, pattern = ".tif$")
+tx370_tif_only<-list.files(path370,full.names = TRUE, pattern = ".tif$")
+tx585_tif_only<-list.files(path585,full.names = TRUE, pattern = ".tif$")
+```
+
+
+Each of the downloads has multiple files in it and this step will pile them together into one layer, also known as a rasterstack
+
+```{r}
+
+ssp126_stack<-stack(tx126_tif_only)
+ssp245_stack<-stack(tx245_tif_only)
+ssp370_stack<-stack(tx370_tif_only)
+ssp585_stack<-stack(tx585_tif_only)
+```
+
+### Get geom boundary 
+Define your bounding geometry. 
+This is where data to define your area of interest goes.
+You may upload your own geometry,such as shapefile or use any of the mapservices available in r.Two options are shown below
+
+```{r, echo=FALSE}
+
+malawi<-rnaturalearth::ne_countries(country ='malawi', returnclass='sf') # option 1
+#mwi<-getData('GADM', country='MWI', level=0) # option 2, remove '#' to execute
+```
+
+
+### Subset your data
+
+Use the geometry in previous step to subset your data to your area of interest.
+We will use two raster functions 'crop' and 'mask' for this task.
+
+```{r}
+
+ssp126malawi<-crop(ssp126_stack,extent(malawi)) ## here you can use your shapefile from previous step or get the bounding coordinates from any map service and enter them in the order (west, east, south, north)
+ssp126malawim<-mask(ssp126malawi,malawi)
+#plot(ssp245malawim)  # remove the '#' sign to plot the individual stacked .tifs
+ssp245malawi<-crop(ssp245_stack,extent(malawi)) 
+ssp245malawim<-mask(ssp245malawi,malawi)
+
+ssp370malawi<-crop(ssp370_stack,extent(malawi)) 
+ssp370malawim<-mask(ssp370malawi,malawi)
+
+ssp585malawi<-crop(ssp585_stack,extent(malawi)) 
+ssp585malawim<-mask(ssp585malawi,malawi)
+```
+
+### Convert subset raster to data frame
+Convert the subset data into data frame format using the function 'as.data.frame' and the 'melt' function to convert our data frame from a wide table to a long table format
+
+
+```{r}
+
+ssp126df<-as.data.frame(ssp126malawim, xy=TRUE, na.rm=TRUE, stringAsFactors=TRUE)%>%
+  melt(id.vars=c('x','y'))
+ssp245df<-as.data.frame(ssp245malawim, xy=TRUE, na.rm=TRUE, stringAsFactors=TRUE)%>%
+  melt(id.vars=c('x','y'))
+ssp370df<-as.data.frame(ssp370malawim, xy=TRUE, na.rm=TRUE, stringAsFactors=TRUE)%>%
+  melt(id.vars=c('x','y'))
+ssp585df<-as.data.frame(ssp585malawim, xy=TRUE, na.rm=TRUE, stringAsFactors=TRUE)%>%
+  melt(id.vars=c('x','y'))
+
+```
+
+
+### Plot  all the rasters from the df and the bounding geometry
+
+```{r}
+
+ggplot()+
+  geom_raster(data=ssp126df, aes(x=x, y=y, fill=value))+
+  facet_wrap(~variable)+
+  geom_sf(fill='transparent', data = malawi)+
+  scale_fill_gradient(low = 'yellow', high = 'red', name='°C')+
+  xlab('Longitude')+ylab('Latitude')+ ggtitle('Monthly Maximum Temperature')+
+  theme_bw()
+  
+```
+
+
+### Select and plot single month
+
+```{r}
+
+xmonthdf<-as.data.frame(ssp126malawim[[06]], xy=TRUE, stringsAsFactors=FALSE)%>%
+  melt(id.vars=c('x','y'))
+ggplot()+
+  geom_raster(data=xmonthdf, aes(x=x, y=y, fill=value))+
+  xlab('Longitude')+ylab('Latitude')+
+  geom_sf(fill='transparent', data = malawi)+
+  scale_fill_gradient(low = 'yellow', high = 'red', name='°C')+
+  ggtitle('Monthly Max Temperature-June')+
+  theme_bw()
+  
+```
+
+### Add column 'Trend' to dataframes
+The next step would be to combine the 4 dataframes into one so that we can create plots easily.
+But since the data variables are identical, with no column to distinguish them, we will add a column called 'Trend' to each and populate it with respective values.
+Then combine the 4 dataframes using the base function 'rbind'.
+
+```{r}
+Trend<-'ssp126'
+ssp126df<-cbind(ssp126df,Trend)
+Trend<-'ssp245'
+ssp245df<-cbind(ssp245df,Trend)
+Trend<-'ssp370'
+ssp370df<-cbind(ssp370df,Trend)
+Trend<-'ssp585'
+ssp585df<-cbind(ssp585df,Trend)
+
+tmax<-rbind(ssp126df,ssp245df,ssp370df,ssp585df)
+
+```
+
+### Add year and month columns to the data frame
+Next, extract month and year values from the variable name and add them as separate columns
+
+```{r}
+
+Year<-substr(tmax$variable,36,44)
+Month<-as.numeric(substr(tmax$variable,46,47))
+tmax<-cbind(tmax, Month, Year)
+```
+Rename column 'value' to 'tmax'
+
+```{r}
+colnames(tmax)[colnames(tmax)=="value"]<-"tmax"
+```
+
+### Plot monthly mean time series
+1. To plot the monthly data, first we have to group the data by 'Trend' and 'Month'
+2. Then calculate monthly mean from the tmax values and feed this data into a plot; we use qplot from the package 'ggeasy'
+
+```{r}
+
+txmon<-tmax%>%group_by(Trend, Month)%>%
+  summarise(across(contains("tmax"), ~mean(tmax, na.rm=TRUE)))
+
+txmon$Month<-factor(txmon$Month,levels = c('1','2','3','4','5','6','7','8','9','10','11','12'))
+
+qplot(factor(Month),tmax, data = txmon, geom = "line", group = Trend, color= Trend) +
+     #facet_grid(Trend ~ ., scale = "free") +
+     scale_x_discrete() +
+  ggtitle('Maximum Temperature Trend - Monthly')+
+     easy_rotate_x_labels(angle = 90, side = "right")+
+  ylab('Max. Temp (°C)')+ xlab('Month')
+```
+
+### Plot annual mean time series
+
+1. To plot the yearly data, first we have to group the data by 'Trend' and 'Year'
+2. Then calculate yearly mean from the tmax values and feed this data into a plot; we use qplot from the package 'ggeasy'
+
+```{r}
+
+txann<-tmax%>% group_by(Year, Trend)%>% 
+  summarise(across(contains("tmax"), ~mean(tmax)))
+tstxann<- ts(txann$tmax,start = 2021,end=2100, frequency = 1)
+#plot(tstxann)
+
+qplot(Year,tmax, data = txann, geom = "line", group = Trend, color= Trend) +
+     #facet_grid(Trend ~ ., scale = "free") +
+     scale_x_discrete() +
+  ggtitle('Maximum Temperature Trend - Annual')+
+     easy_rotate_x_labels(angle = 90, side = "right")+
+  ylab('Max. Temp (°C)')+ xlab('Period (Years)')
+#plotly::ggplotly(myplot)
+```
+
