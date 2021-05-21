@@ -1,5 +1,5 @@
 ---
-title: "Pr_worldclim_2010_18"
+title: "Plotting worldclim  monlthy data -  Precipitation"
 author: "Kami Makabe"
 date: "4/12/2021"
 output: html_document
@@ -30,27 +30,39 @@ library(timeSeries)
 library(stringr)
 ```
 
-### load tif files only
+### Import files into r
+
+Then load the files into your r environment. 
+As a tip, since we already know our data is in .tif format, we will give r the instructions to only load files with the .tif extension. This works well, incase you use the directory for other file types.
 
 ```{r}
 pr_tif_only<-list.files(prpath,full.names = TRUE, pattern = ".tif$")
 ```
 
 
-## stack .tif files (108)
+There is one data file for each month for the 9 year period (2010-2018). We cretae a single multilayer file by stacking or piling these multiple files together.The resulting layer, is known as a rasterstack.
 
 ```{r}
 prstack<-stack(pr_tif_only)
 ```
 
-### Get Malawi geom, source: natural earth.org
+### Get geom boundary 
+Define your bounding geometry. 
+This is where data to define your area of interest goes.
+You may upload your own geometry,such as shapefile or use any of the mapservices available in r. In this case we will use the mapservice 'naturalearth'.
+
 
 ```{r, echo=FALSE}
 malawi<-rnaturalearth::ne_countries(country ='malawi', returnclass='sf')
 ```
 
 
-### crop for area of interest
+### Subset your data
+
+Use the geometry in previous step to subset your data to your area of interest.
+We will use two raster functions 'crop' and 'mask' for this task.
+
+_Depending on the size of your data and computer's processing power, this process and the one on converting raster to a data frame may require assigning more memory to r. An error message as this one' cannot allocate vector of size xx gb' indicates such memory limits. To check current memory allocation use command 'memory.size()'. To allocate more memory use command 'memory.limit(enter new max allocation)'.
 
 ```{r,echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -75,7 +87,9 @@ plot(pr_mon_mean)
 ```
 
 
-## convert stack to data frame
+### Convert subset raster to data frame
+Convert the subset data into data frame format using the function 'as.data.frame' and the 'melt' function to convert our data frame from a wide table to a long table format
+
 
 ```{r}
 prdf<-as.data.frame(pr_mon_mean, xy=TRUE)%>%
@@ -84,7 +98,7 @@ prdf<-as.data.frame(pr_mon_mean, xy=TRUE)%>%
 ```
 
 
-### plot geom raster
+### Plot  all the rasters from the df and the bounding geometry
 
 ```{r}
 ggplot()+
@@ -97,8 +111,7 @@ ggplot()+
   
 ```
 
-
-### select and plot single month
+### Select and plot single month
 
 ```{r}
 xmonthdf<-as.data.frame(pr_mon_mean[[06]], xy=TRUE, stringsAsFactors=FALSE)%>%
@@ -115,13 +128,14 @@ ggplot()+
 
 ### including other plots
 
-#### first prepare the raw raster data as data frame
+First, prepare the raw raster data as data frame
 
 ```{r}
 stdf_pr<-as.data.frame(wcprmalawim,xy=TRUE, na.rm=TRUE, stringsAsFactors=FALSE)%>%
   melt(id.vars=c('x','y'))
 ```
-## then extract and format the date values into as.date
+Then extract and format the date values into date format
+The date information is contained in the variable name; the last part of the variable name. The process below will extract this information and put it in a new column.
 
 ```{r}
 Dt<-stdf_pr$variable
@@ -132,14 +146,16 @@ prdfdate<-as.Date(paste(substr(Dt,2,5),substr(Dt,7,8),'01', sep = "-"))
 
 ```
 
-#### add proper date column to your dataframe
+Add /join the resulting date column to the  data frame
 
 ```{r}
 stdf_date<-stdf_pr # created a copy of the df just as extra caution
 Date<-prdfdate # a copy of the date values as extra caution too
 stdfpr_dt<-cbind(stdf_date,Date)
 ```
-### add Month and year columns
+
+We use the same process as above to extract the year and month values from the variable name, and join these to the data frame. Our data frame now has 3 more columns/variables.
+If dealing with daily data, the 'Day' information can be extracted using the same approach.
 
 ```{r}
 Year<-substr(Dt,2,5)
@@ -148,12 +164,12 @@ stdf_pr<-cbind(stdfpr_dt, Year, Month)
 ```
 
 
-### rename column 'value' to 'pr'
+Rename column 'value' to 'pr'
 
 ```{r}
 colnames(stdf_pr)[colnames(stdf_pr)=="value"]<-"pr"
 ```
-
+Plot a line graph for alll your data values as they are
 ```{r}
 ggplot(stdf_pr, aes(Date,pr))+
   geom_line(col='blue')+
@@ -163,7 +179,9 @@ ggplot(stdf_pr, aes(Date,pr))+
 
 ```
 
-### monthly mean time series
+### Plot monthly mean time series
+1. To plot the monthly trend, first we have to group the data by 'Month'
+2. Then calculate monthly mean from the pr values and feed this data into a time series plot
  
 ```{r}
 prmonthdat<-stdf_pr%>% group_by(Month)%>% 
@@ -172,7 +190,10 @@ tsprmon<- ts(prmonthdat$pr)
 plot(tsprmon)
 ```
 
-### annual mean time series
+### Plot Annual mean time series
+1. To plot the annual trend, first we have to group the data by 'Year'
+2. Then calculate annual mean from the pr values and feed this data into a time series plot
+ 
 
 ```{r}
 
@@ -182,7 +203,7 @@ tsprann<- ts(pranndat$pr, start = c(2010, 06), end=c(2018, 12), frequency = 1)
 plot(tsprann)
 ```
 
-### export df as csv (or other file type)
+You may choose to export the data frame as csv (or other file type)
 #```{r}  ## remove the '#' in the beginning of line to run code
 library(readr)
 csvpath <- "prpath"
