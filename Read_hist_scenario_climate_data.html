@@ -1,0 +1,357 @@
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+</head>
+
+
+
+<div id="read-and-analyze-climate-data-in-r" class="section level1">
+<h1>Read and analyze climate data in r</h1>
+<p>The first step is to set your working directory, where your files are stored. You can do this from the toolbar tab session, and choose ‘Set Working Directory’ from the drop down menu.</p>
+<div id="load-required-libraries" class="section level3">
+<h3>Load required libraries</h3>
+<p>If using r for the first time, you need to install the respective packages fisrt. The package names as similar to the libraries.</p>
+<pre class="r"><code>library(R.utils)
+library(raster)
+library(cruts)
+library(magrittr)
+library(rnaturalearth)
+library(dplyr)
+library(reshape)
+library(ggplot2)
+library(lubridate)
+library(timeSeries)
+library(stringr)
+library(ggeasy)</code></pre>
+</div>
+<div id="historical-climate-data" class="section level2">
+<h2>Historical climate data</h2>
+<div id="load-data-from-cru-website" class="section level3">
+<h3>Load data from cru website</h3>
+<ol style="list-style-type: decimal">
+<li>On your browser, navigate to (<a href="https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_4.05/cruts.2103051243.v4.05/" class="uri">https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_4.05/cruts.2103051243.v4.05/</a>). This is where all data variables are stored.</li>
+<li>Select the variable of your choice. In the example below, we will use precipitation data, variable name ‘pre’.</li>
+<li>On the pre data, find data for the years 1901-2020(cru_ts4.05.1901.2020.pre.dat.nc.gz).</li>
+<li>Right click on it and copy link address. Open a code chunk and paste your link in an object( as in ‘myurl’ in below code).</li>
+<li>Call the function ‘download.file’ and enter details as below.</li>
+<li>The files are stored as a compressed .gz file; to extract the files, call the function ‘gunzip’ and enter file name with the .gz extension</li>
+<li>Run code</li>
+</ol>
+<pre class="r"><code>myurl&lt;- &quot;https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_4.05/cruts.2103051243.v4.05/pre/cru_ts4.05.1901.2020.pre.dat.nc.gz&quot;
+download.file(myurl, destfile=&quot;cru_ts4.05.1901.2020.pre.dat.nc.gz&quot;)
+gunzip(&quot;cru_ts4.05.1901.2020.pre.dat.nc.gz&quot;)
+#;-) Error in decompressFile.default(filename = filename, ..., ext = ext, FUN = FUN): File already exists: cru_ts4.05.1901.2020.pre.dat.nc</code></pre>
+</div>
+<div id="load-geometry-data" class="section level3">
+<h3>Load geometry data</h3>
+<p>This is where data to define your area of interest goes. You may upload your own geometry,such as shapefile or use any of the mapservices available in r. In this case we will use country boundaries from the package ‘rnaturalearth’</p>
+<pre class="r"><code>malawi&lt;-rnaturalearth::ne_countries(country =&#39;malawi&#39;)</code></pre>
+</div>
+<div id="convert-the-data-from-netcdf-to-raster-stack" class="section level3">
+<h3>Convert the data from netcdf to raster stack</h3>
+<p>Create new object name and call function ‘cruts2rater’ Define the data you want to transform, your area of interest, and the time range. To extract data exactly to your polygon shape, use the raster function ‘mask’ and the bounding geometry</p>
+<pre class="r"><code>crudata&lt;-cruts2raster(&quot;cru_ts4.05.1901.2020.pre.dat.nc&quot;,poly = malawi,timeRange = c(&quot;1901-01-01&quot;,&quot;2020-12-31&quot;), type = &quot;stack&quot;)
+#;-)   |                                                                              |                                                                      |   0%  |                                                                              |                                                                      |   1%  |                                                                              |=                                                                     |   1%  |                                                                              |=                                                                     |   2%  |                                                                              |==                                                                    |   2%  |                                                                              |==                                                                    |   3%  |                                                                              |==                                                                    |   4%  |                                                                              |===                                                                   |   4%  |                                                                              |===                                                                   |   5%  |                                                                              |====                                                                  |   5%  |                                                                              |====                                                                  |   6%  |                                                                              |=====                                                                 |   6%  |                                                                              |=====                                                                 |   7%  |                                                                              |=====                                                                 |   8%  |                                                                              |======                                                                |   8%  |                                                                              |======                                                                |   9%  |                                                                              |=======                                                               |   9%  |                                                                              |=======                                                               |  10%  |                                                                              |=======                                                               |  11%  |                                                                              |========                                                              |  11%  |                                                                              |========                                                              |  12%  |                                                                              |=========                                                             |  12%  |                                                                              |=========                                                             |  13%  |                                                                              |=========                                                             |  14%  |                                                                              |==========                                                            |  14%  |                                                                              |==========                                                            |  15%  |                                                                              |===========                                                           |  15%  |                                                                              |===========                                                           |  16%  |                                                                              |============                                                          |  16%  |                                                                              |============                                                          |  17%  |                                                                              |============                                                          |  18%  |                                                                              |=============                                                         |  18%  |                                                                              |=============                                                         |  19%  |                                                                              |==============                                                        |  19%  |                                                                              |==============                                                        |  20%  |                                                                              |==============                                                        |  21%  |                                                                              |===============                                                       |  21%  |                                                                              |===============                                                       |  22%  |                                                                              |================                                                      |  22%  |                                                                              |================                                                      |  23%  |                                                                              |================                                                      |  24%  |                                                                              |=================                                                     |  24%  |                                                                              |=================                                                     |  25%  |                                                                              |==================                                                    |  25%  |                                                                              |==================                                                    |  26%  |                                                                              |===================                                                   |  26%  |                                                                              |===================                                                   |  27%  |                                                                              |===================                                                   |  28%  |                                                                              |====================                                                  |  28%  |                                                                              |====================                                                  |  29%  |                                                                              |=====================                                                 |  29%  |                                                                              |=====================                                                 |  30%  |                                                                              |=====================                                                 |  31%  |                                                                              |======================                                                |  31%  |                                                                              |======================                                                |  32%  |                                                                              |=======================                                               |  32%  |                                                                              |=======================                                               |  33%  |                                                                              |=======================                                               |  34%  |                                                                              |========================                                              |  34%  |                                                                              |========================                                              |  35%  |                                                                              |=========================                                             |  35%  |                                                                              |=========================                                             |  36%  |                                                                              |==========================                                            |  36%  |                                                                              |==========================                                            |  37%  |                                                                              |==========================                                            |  38%  |                                                                              |===========================                                           |  38%  |                                                                              |===========================                                           |  39%  |                                                                              |============================                                          |  39%  |                                                                              |============================                                          |  40%  |                                                                              |============================                                          |  41%  |                                                                              |=============================                                         |  41%  |                                                                              |=============================                                         |  42%  |                                                                              |==============================                                        |  42%  |                                                                              |==============================                                        |  43%  |                                                                              |==============================                                        |  44%  |                                                                              |===============================                                       |  44%  |                                                                              |===============================                                       |  45%  |                                                                              |================================                                      |  45%  |                                                                              |================================                                      |  46%  |                                                                              |=================================                                     |  46%  |                                                                              |=================================                                     |  47%  |                                                                              |=================================                                     |  48%  |                                                                              |==================================                                    |  48%  |                                                                              |==================================                                    |  49%  |                                                                              |===================================                                   |  49%  |                                                                              |===================================                                   |  50%  |                                                                              |===================================                                   |  51%  |                                                                              |====================================                                  |  51%  |                                                                              |====================================                                  |  52%  |                                                                              |=====================================                                 |  52%  |                                                                              |=====================================                                 |  53%  |                                                                              |=====================================                                 |  54%  |                                                                              |======================================                                |  54%  |                                                                              |======================================                                |  55%  |                                                                              |=======================================                               |  55%  |                                                                              |=======================================                               |  56%  |                                                                              |========================================                              |  56%  |                                                                              |========================================                              |  57%  |                                                                              |========================================                              |  58%  |                                                                              |=========================================                             |  58%  |                                                                              |=========================================                             |  59%  |                                                                              |==========================================                            |  59%  |                                                                              |==========================================                            |  60%  |                                                                              |==========================================                            |  61%  |                                                                              |===========================================                           |  61%  |                                                                              |===========================================                           |  62%  |                                                                              |============================================                          |  62%  |                                                                              |============================================                          |  63%  |                                                                              |============================================                          |  64%  |                                                                              |=============================================                         |  64%  |                                                                              |=============================================                         |  65%  |                                                                              |==============================================                        |  65%  |                                                                              |==============================================                        |  66%  |                                                                              |===============================================                       |  66%  |                                                                              |===============================================                       |  67%  |                                                                              |===============================================                       |  68%  |                                                                              |================================================                      |  68%  |                                                                              |================================================                      |  69%  |                                                                              |=================================================                     |  69%  |                                                                              |=================================================                     |  70%  |                                                                              |=================================================                     |  71%  |                                                                              |==================================================                    |  71%  |                                                                              |==================================================                    |  72%  |                                                                              |===================================================                   |  72%  |                                                                              |===================================================                   |  73%  |                                                                              |===================================================                   |  74%  |                                                                              |====================================================                  |  74%  |                                                                              |====================================================                  |  75%  |                                                                              |=====================================================                 |  75%  |                                                                              |=====================================================                 |  76%  |                                                                              |======================================================                |  76%  |                                                                              |======================================================                |  77%  |                                                                              |======================================================                |  78%  |                                                                              |=======================================================               |  78%  |                                                                              |=======================================================               |  79%  |                                                                              |========================================================              |  79%  |                                                                              |========================================================              |  80%  |                                                                              |========================================================              |  81%  |                                                                              |=========================================================             |  81%  |                                                                              |=========================================================             |  82%  |                                                                              |==========================================================            |  82%  |                                                                              |==========================================================            |  83%  |                                                                              |==========================================================            |  84%  |                                                                              |===========================================================           |  84%  |                                                                              |===========================================================           |  85%  |                                                                              |============================================================          |  85%  |                                                                              |============================================================          |  86%  |                                                                              |=============================================================         |  86%  |                                                                              |=============================================================         |  87%  |                                                                              |=============================================================         |  88%  |                                                                              |==============================================================        |  88%  |                                                                              |==============================================================        |  89%  |                                                                              |===============================================================       |  89%  |                                                                              |===============================================================       |  90%  |                                                                              |===============================================================       |  91%  |                                                                              |================================================================      |  91%  |                                                                              |================================================================      |  92%  |                                                                              |=================================================================     |  92%  |                                                                              |=================================================================     |  93%  |                                                                              |=================================================================     |  94%  |                                                                              |==================================================================    |  94%  |                                                                              |==================================================================    |  95%  |                                                                              |===================================================================   |  95%  |                                                                              |===================================================================   |  96%  |                                                                              |====================================================================  |  96%  |                                                                              |====================================================================  |  97%  |                                                                              |====================================================================  |  98%  |                                                                              |===================================================================== |  98%  |                                                                              |===================================================================== |  99%  |                                                                              |======================================================================|  99%  |                                                                              |======================================================================| 100%
+cruprmalawi&lt;-mask(crudata,malawi)
+#plot(cruprmalawi) ## optional; to view raster</code></pre>
+</div>
+<div id="convert-the-raster-stack-created-above-into-a-dataframe-format" class="section level3">
+<h3>Convert the raster stack created above into a dataframe format</h3>
+<p>This step extracts raster values at each station (depicted by its latitude and longitude) and stores them as a table. The ‘melt’ function converts the data from a wide to long table format</p>
+<pre class="r"><code>cruprdf&lt;-as.data.frame(cruprmalawi, xy=TRUE, na.rm=TRUE)%&gt;% 
+  melt(id.vars=c(&#39;x&#39;,&#39;y&#39;))
+#;-) Error in file(fn, &quot;rb&quot;): cannot open the connection</code></pre>
+</div>
+<div id="format-data-with-proper-date-column-and-change-column-labels" class="section level3">
+<h3>Format data with proper date column and change column labels</h3>
+<p>The time variable in our data is stored as a character and the step below is to extract the dates from this variable and store them in a new column/variable. We also, create two more columns to separate Year and Month</p>
+<pre class="r"><code>Date&lt;-substr(cruprdf$variable, 2,11) # extract date values from df
+#;-) Error in substr(cruprdf$variable, 2, 11): object &#39;cruprdf&#39; not found
+cruprdf$Date&lt;-Date # add date column to df
+#;-) Error in cruprdf$Date &lt;- Date: object &#39;cruprdf&#39; not found
+Year&lt;-substr(Date,1,4)
+#;-) Error in as.character(x): cannot coerce type &#39;closure&#39; to vector of type &#39;character&#39;
+Month&lt;-substr(Date,6,7)
+#;-) Error in as.character(x): cannot coerce type &#39;closure&#39; to vector of type &#39;character&#39;
+cruprdf&lt;-cbind(cruprdf, Year, Month)
+#;-) Error in cbind(cruprdf, Year, Month): object &#39;cruprdf&#39; not found
+
+colnames(cruprdf)[colnames(cruprdf)==&quot;value&quot;]&lt;-&quot;pr&quot;  # change column label
+#;-) Error in colnames(cruprdf)[colnames(cruprdf) == &quot;value&quot;] &lt;- &quot;pr&quot;: object &#39;cruprdf&#39; not found</code></pre>
+</div>
+<div id="plot-monthly-data" class="section level3">
+<h3>Plot Monthly data</h3>
+<p>Our data is now ready for some statistical analysis. we may plot monthly data as below; + Install and load package ‘ggplot2’ + Call the function ‘ggplot’ and enter data to plot + Specify the aesthetic values in the order x,y + Call the function ‘geom_line’ and specify parameters as necessary. + Specify labels for your x and y axis and add a title for your plot. + You may optionally add a theme. Play with the themes to see which suits you better.</p>
+<pre class="r"><code>ggplot(cruprdf, aes(Date,pr))+
+  geom_line(col=&#39;blue&#39;)+
+  xlab(&#39;Time&#39;)+ylab(&#39;pr (mm)&#39;)+
+  ggtitle(&#39;Monthly Precipitation&#39;)+
+  theme_bw()
+#;-) Error in ggplot(cruprdf, aes(Date, pr)): object &#39;cruprdf&#39; not found</code></pre>
+</div>
+<div id="monthly-mean-time-series" class="section level3">
+<h3>Monthly mean time series</h3>
+<p>or as a time series as in below; + First, group the data by months + Summarize the data by mean values for each month + Convert the summarized data into a timeseries object + Plot timeseries object</p>
+<pre class="r"><code>pr_monthly&lt;-cruprdf%&gt;% group_by(Month)%&gt;%
+  summarise(across(contains(&quot;pr&quot;), ~mean(pr, na.rm=TRUE))) 
+#;-) Error in eval(lhs, parent, parent): object &#39;cruprdf&#39; not found
+pr_monthly$Month&lt;-factor(pr_monthly$Month,levels = c(&#39;6&#39;,&#39;7&#39;,&#39;8&#39;,&#39;9&#39;,&#39;10&#39;,&#39;11&#39;,&#39;12&#39;,&#39;1&#39;,&#39;2&#39;,&#39;3&#39;,&#39;4&#39;,&#39;5&#39;)) # reorder the months to start plotting from June to January
+#;-) Error in factor(pr_monthly$Month, levels = c(&quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, &quot;10&quot;, : object &#39;pr_monthly&#39; not found
+
+tsprmon&lt;- ts(pr_monthly$pr)
+#;-) Error in is.data.frame(data): object &#39;pr_monthly&#39; not found
+
+plot(tsprmon)
+#;-) Error in h(simpleError(msg, call)): error in evaluating the argument &#39;x&#39; in selecting a method for function &#39;plot&#39;: object &#39;tsprmon&#39; not found</code></pre>
+</div>
+<div id="annual-mean-time-series" class="section level3">
+<h3>Annual mean time series</h3>
+<p>or the annual mean values as below; + First, group the data by years + Summarize the data by mean values for each year + Convert the summarized data into a timeseries object + Plot timeseries object</p>
+<pre class="r"><code>pr_ann&lt;-cruprdf%&gt;% group_by(Year)%&gt;% 
+  summarise(across(contains(&quot;pr&quot;), ~mean(pr, na.rm=TRUE)))
+#;-) Error in eval(lhs, parent, parent): object &#39;cruprdf&#39; not found
+tsprann&lt;- ts(pr_ann$pr,start= 1901,frequency = 1)
+#;-) Error in is.data.frame(data): object &#39;pr_ann&#39; not found
+plot(tsprann)
+#;-) Error in h(simpleError(msg, call)): error in evaluating the argument &#39;x&#39; in selecting a method for function &#39;plot&#39;: object &#39;tsprann&#39; not found</code></pre>
+</div>
+</div>
+<div id="cmip6-historical-and-scenario-data" class="section level2">
+<h2>CMIP6 historical and scenario data</h2>
+<ol style="list-style-type: decimal">
+<li>Climate scenario data can be accessed from any of the following sites;</li>
+</ol>
+<ul>
+<li><a href="https://esgf-node.llnl.gov/projects/cmip6/">USA, PCMDI/LLNL (California)</a></li>
+<li><a href="https://esgf-node.ipsl.upmc.fr/projects/cmip6-ipsl/">France, IPSL</a></li>
+<li><a href="https://esgf-data.dkrz.de/projects/cmip6-dkrz/">Germany, DKRZ</a></li>
+<li><a href="https://esgf-index1.ceda.ac.uk/projects/cmip6-ceda/">UK, CEDA</a></li>
+</ul>
+<ol start="2" style="list-style-type: decimal">
+<li>To download data, please create an account and navigate to the search menu</li>
+<li>There are more than a dozen parameters to consider. It helps if you are specific in your requirements. To get the data used in this exercise, we will use the parameters as in this snapshot: <img src="C:/Workspace/RMardown_NAPS/Guide/Snapshots/CMIP6_Params.JPG" alt="CMIP6_Params" /></li>
+<li>Ensure the downloaded files are in your working directory otherwise, when loading them into r, use the full path to their directory location</li>
+<li>Historical data can be accessed with same parameters as above, except for ‘Activity’ which changess to ‘CMIP6’ and ‘Experiment ID’ which changes to ‘historical’. See screenshot <img src="C:/Workspace/RMardown_NAPS/Guide/Snapshots/CMIP6_Params_hist.JPG" alt="CMIP6_Params_hist" /></li>
+</ol>
+<div id="load-your-downloaded.nc-files" class="section level3">
+<h3>Load your downloaded.nc files</h3>
+<ol style="list-style-type: decimal">
+<li>Call the ‘raster’ library</li>
+<li>Create object names for your data and load the files as in code below. # remember to use full path if the working directory is not the same as your file location</li>
+<li>Run code</li>
+</ol>
+<pre class="r"><code>prmiroc126&lt;-stack(&quot;pr_Amon_MIROC-ES2L_ssp126_r1i1p1f2_gn_201501-210012.nc&quot;)
+prmiroc245&lt;-stack(&quot;pr_Amon_MIROC-ES2L_ssp245_r1i1p1f2_gn_201501-210012.nc&quot;)
+prmiroc585&lt;-stack(&quot;pr_Amon_MIROC-ES2L_ssp585_r1i1p1f2_gn_201501-210012 .nc&quot;)
+prmirochist&lt;-stack(&quot;pr_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_185001-201412.nc&quot;)</code></pre>
+</div>
+<div id="get-geom-boundary-from-natural-earth" class="section level3">
+<h3>get geom boundary from natural earth</h3>
+<p>Define your bounding geometry.</p>
+<pre class="r"><code>Malawi&lt;-ne_countries(country = &#39;malawi&#39;, returnclass = &#39;sf&#39;)</code></pre>
+</div>
+<div id="subset-your-data" class="section level3">
+<h3>Subset your data</h3>
+<p>Use the geometry in previous step to subset your data to your area of interest. We will use two raster functions ‘crop’ and ‘mask’ for this task.</p>
+<pre class="r"><code>prmiroc126Malawi&lt;-crop(prmiroc126, Malawi)
+prmiroc126Malawim&lt;-mask(prmiroc126Malawi, Malawi)
+
+prmiroc245Malawi&lt;-crop(prmiroc245, Malawi)
+prmiroc245Malawim&lt;-mask(prmiroc245Malawi, Malawi)
+
+prmiroc585Malawi&lt;-crop(prmiroc585, Malawi)
+prmiroc585Malawim&lt;-mask(prmiroc585Malawi, Malawi)
+
+prmirochistMalawi&lt;-crop(prmirochist, Malawi)
+prmirochistMalawim&lt;-mask(prmirochistMalawi, Malawi)</code></pre>
+</div>
+<div id="convert-subset-raster-to-data-frame" class="section level3">
+<h3>Convert subset raster to data frame</h3>
+<p>Convert the subset data into data frame format using the function ‘as.data.frame’ and the ‘melt’ function to convert our data frame from a wide table to a long table format</p>
+<pre class="r"><code>dfprmiroc126&lt;-as.data.frame(prmiroc126Malawim, xy=TRUE)%&gt;%
+  melt(id.vars=c(&#39;x&#39;,&#39;y&#39;))%&gt;% na.omit(dfprmiroc126)
+
+dfprmiroc245&lt;-as.data.frame(prmiroc245Malawim, xy=TRUE)%&gt;%
+  melt(id.vars=c(&#39;x&#39;,&#39;y&#39;))%&gt;% na.omit(dfprmiroc245)
+
+dfprmiroc585&lt;-as.data.frame(prmiroc585Malawim, xy=TRUE)%&gt;%
+  melt(id.vars=c(&#39;x&#39;,&#39;y&#39;))%&gt;%
+  na.omit(dfprmiroc585)
+
+dfprmirochist&lt;-as.data.frame(prmirochistMalawim, xy=TRUE)%&gt;%
+  melt(id.vars=c(&#39;x&#39;,&#39;y&#39;))%&gt;%
+  na.omit(dfprmirochist)</code></pre>
+</div>
+<div id="add-column-trend-to-dataframes" class="section level3">
+<h3>Add column ‘Trend’ to dataframes</h3>
+<p>The next step would be to combine the 3 dataframes into one so that we can create plots easily. But since the data variables are identical, with no column to distinguish them, we will add a column called ‘Trend’ to each and populate it with respective values. Then combine the 3 dataframes using the base function ‘rbind’</p>
+<pre class="r"><code>Trend&lt;-&#39;ssp126&#39;
+prmiroc1&lt;-cbind(dfprmiroc126,Trend)
+Trend&lt;-&#39;ssp245&#39;
+prmiroc2&lt;-cbind(dfprmiroc245,Trend)
+Trend&lt;-&#39;ssp585&#39;
+prmiroc5&lt;-cbind(dfprmiroc585,Trend)
+Trend&lt;-&#39;historical&#39;
+prmiroch&lt;-cbind(dfprmirochist,Trend)
+prmiroccomb&lt;-rbind(prmiroc1,prmiroc2,prmiroc5, prmiroch)</code></pre>
+</div>
+</div>
+<div id="extract-and-format-the-date-values-into-as.date" class="section level2">
+<h2>Extract and format the date values into as.date</h2>
+<p>The time variable in our data is stored as a character and the step below is to extract the dates from this variable and store them in a new column named ‘Date’.</p>
+<pre class="r"><code>Dt&lt;-prmiroccomb$variable
+str_sub(Dt,-2)
+str_sub(Dt,-5,-4)
+str_sub(Dt,-10,-7)
+paste(str_sub(Dt,-10,-7),str_sub(Dt,-5,-4),str_sub(Dt,-2), sep = &quot;-&quot;)
+Date&lt;-as.Date(paste(str_sub(Dt,-10,-7),str_sub(Dt,-5,-4),str_sub(Dt,-2), sep = &quot;-&quot;))</code></pre>
+<p>Add the proper Date column to the dataframe using the function ‘cbind’</p>
+<pre class="r"><code>prmiroccombdt&lt;-cbind(prmiroccomb,Date)</code></pre>
+<p>Next, extract month and year values and add them as separate columns</p>
+<pre class="r"><code>Year&lt;-substr(Dt,2,5)
+Month&lt;-substr(Dt,7,8)
+Day&lt;-substr(Dt,10,11)
+prmirocdf&lt;-cbind(prmiroccombdt, Year, Month,Day)</code></pre>
+<p>Next, rename column ‘value’ to ‘pr’</p>
+<pre class="r"><code>colnames(prmirocdf)[colnames(prmirocdf)==&quot;value&quot;]&lt;-&quot;pr&quot;</code></pre>
+<div id="plot-data-as-is-in-line-graph" class="section level3">
+<h3>Plot data as is in line graph</h3>
+<p>Call the function ‘ggplot2’ and enter details as below</p>
+<pre class="r"><code>ggplot(prmirocdf, aes(Date,pr))+
+  geom_line(col=&#39;blue&#39;)+
+  facet_grid(Trend~.,scales = &#39;free_x&#39;)+
+  #scale_alpha_manual(breaks = 50)+
+  ggtitle(&#39;Monthly Precipitation&#39;)+
+  theme_bw()</code></pre>
+<p><img src="https://i.imgur.com/s58dP1v.png" /></p>
+</div>
+<div id="plot-annual-mean-time-series" class="section level3">
+<h3>Plot Annual mean time series</h3>
+<ol style="list-style-type: decimal">
+<li>To plot the annual data, first we have to group the data by Trend and year</li>
+<li>Then calculate yearly mean form the pr values and feed this data into a plot; we use qplot grom the package ‘ggeasy’</li>
+</ol>
+<pre class="r"><code>prmirocanndat&lt;-prmirocdf%&gt;% group_by(Trend, Year)%&gt;% 
+  summarise(across(contains(&quot;pr&quot;), ~mean(pr, na.rm=TRUE)))
+
+qplot(Year, pr, data = prmirocanndat, geom = &quot;line&quot;, group = Trend
+      , color= Trend) +
+     #facet_grid(Trend ~ ., scale = &quot;free&quot;) +
+     scale_x_discrete() +
+  ggtitle(&#39;Annual Precipitation Trend&#39;)+
+     easy_rotate_x_labels(angle = 90, side = &quot;right&quot;)</code></pre>
+<p><img src="https://i.imgur.com/iAqJH4G.png" /></p>
+<pre class="r"><code>#plotly::ggplotly(myplot)</code></pre>
+<details style="margin-bottom:10px;">
+<summary>
+Standard output and standard error
+</summary>
+<code>C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Read_Climate_data_reprex_std_out_err.txt</code>
+</details>
+<details style="margin-bottom:10px;">
+<summary>
+Standard output and standard error
+</summary>
+<pre class="sh"><code>[31mx[39m Install the [34m[34mstyler[34m[39m package in order to use [38;5;235m[48;5;253m[38;5;235m[48;5;253m`style = TRUE`[48;5;253m[38;5;235m[49m[39m.
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.1 (2020-08-26 16:20:06 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.24.0 (2020-08-26 16:11:58 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: &#39;R.oo&#39;
+
+The following object is masked from &#39;package:R.methodsS3&#39;:
+
+    throw
+
+The following objects are masked from &#39;package:methods&#39;:
+
+    getClasses, getMethods
+
+The following objects are masked from &#39;package:base&#39;:
+
+    attach, detach, load, save
+
+R.utils v2.10.1 (2020-08-26 22:50:31 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: &#39;R.utils&#39;
+
+The following object is masked from &#39;package:utils&#39;:
+
+    timestamp
+
+The following objects are masked from &#39;package:base&#39;:
+
+    cat, commandArgs, getOption, inherits, isOpen, nullfile, parse,
+    warnings
+
+Loading required package: sp
+
+Attaching package: &#39;raster&#39;
+
+The following objects are masked from &#39;package:R.utils&#39;:
+
+    extract, resample
+
+The following objects are masked from &#39;package:R.oo&#39;:
+
+    extend, trim
+
+
+Attaching package: &#39;magrittr&#39;
+
+The following object is masked from &#39;package:raster&#39;:
+
+    extract
+
+The following object is masked from &#39;package:R.utils&#39;:
+
+    extract
+
+The following object is masked from &#39;package:R.oo&#39;:
+
+    equals
+
+
+Attaching package: &#39;dplyr&#39;
+
+The following objects are masked from &#39;package:raster&#39;:
+
+    intersect, select, union
+
+The following objects are masked from &#39;package:stats&#39;:
+
+    filter, lag
+
+The following objects are masked from &#39;package:base&#39;:
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: &#39;reshape&#39;
+
+The following object is masked from &#39;package:dplyr&#39;:
+
+    rename
+
+
+Attaching package: &#39;lubridate&#39;
+
+The following object is masked from &#39;package:reshape&#39;:
+
+    stamp
+
+The following objects are masked from &#39;package:raster&#39;:
+
+    intersect, union
+
+The following objects are masked from &#39;package:base&#39;:
+
+    date, intersect, setdiff, union
+
+Loading required package: timeDate
+`summarise()` has grouped output by &#39;Trend&#39;. You can override using the `.groups` argument.
+There were 15 warnings (use warnings() to see them)</code></pre>
+</details>
+</div>
+</div>
+</div>

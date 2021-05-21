@@ -1,0 +1,344 @@
+```{r reprex-options, include = FALSE}
+options(
+  keep.source = TRUE,
+  rlang_trace_top_env = globalenv(),
+  `rlang:::force_unhandled_error` = TRUE,
+  rlang_backtrace_on_error = "full",
+  crayon.enabled = FALSE,
+  reprex.current_venue = "html"
+)
+```
+
+```{r, results = 'asis', echo = FALSE, include = file.exists('.Rprofile'), eval = file.exists('.Rprofile')}
+cat(sprintf("*Local `.Rprofile` detected at `%s`*", normalizePath(".Rprofile")))
+```
+
+---
+output:
+  reprex::reprex_document:
+    venue: "html"
+    advertise: FALSE
+    session_info: FALSE
+    style: TRUE
+    comment: "#;-)"
+    tidyverse_quiet: FALSE
+    std_out_err: TRUE
+    
+knit: reprex::reprex_render
+---
+# Read and analyze climate data in r
+
+The first step is to set your working directory, where your files are stored. You can do this from the toolbar tab session, and choose 'Set Working Directory' from the drop down menu.
+
+### Load required libraries
+If using r for the first time, you need to install the respective packages fisrt.
+The package names as similar to the libraries.
+
+```{r, warning=FALSE, message=FALSE}
+library(R.utils)
+library(raster)
+library(cruts)
+library(magrittr)
+library(rnaturalearth)
+library(dplyr)
+library(reshape)
+library(ggplot2)
+library(lubridate)
+library(timeSeries)
+library(stringr)
+library(ggeasy)
+```
+
+## Historical climate data
+
+### Load data from cru website
+
+1. On your browser, navigate to (https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_4.05/cruts.2103051243.v4.05/). This is where all data variables are stored. 
+2. Select the variable of your choice. In the example below, we will use precipitation data, variable name 'pre'. 
+3. On the pre data, find data for the years 1901-2020(cru_ts4.05.1901.2020.pre.dat.nc.gz). 
+4. Right click on it and copy link address. Open a code chunk and paste your link in an object( as in 'myurl' in below code).
+5. Call the function 'download.file' and enter details as below.
+6. The files are stored as a compressed .gz file; to extract the files, call the function 'gunzip' and enter file name with the .gz extension
+7. Run code
+
+
+```{r, cache=TRUE}
+
+myurl<- "https://crudata.uea.ac.uk/cru/data/hrg/cru_ts_4.05/cruts.2103051243.v4.05/pre/cru_ts4.05.1901.2020.pre.dat.nc.gz"
+download.file(myurl, destfile="cru_ts4.05.1901.2020.pre.dat.nc.gz")
+gunzip("cru_ts4.05.1901.2020.pre.dat.nc.gz")
+```
+
+### Load geometry data
+This is where data to define your area of interest goes.
+You may upload your own geometry,such as shapefile or use any of the mapservices available in r. In this case we will use country boundaries from the package 'rnaturalearth'
+
+```{r, warning=FALSE, message=FALSE}
+
+malawi<-rnaturalearth::ne_countries(country ='malawi')
+```
+
+### Convert the data from netcdf to raster stack
+Create new object name and call function 'cruts2rater'
+Define the data you want to transform, your area of interest, and the time range.
+To extract data exactly to your polygon shape, use the raster function 'mask' and the bounding geometry
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+
+crudata<-cruts2raster("cru_ts4.05.1901.2020.pre.dat.nc",poly = malawi,timeRange = c("1901-01-01","2020-12-31"), type = "stack")
+cruprmalawi<-mask(crudata,malawi)
+#plot(cruprmalawi) ## optional; to view raster
+```
+
+### Convert the raster stack created above into a dataframe format
+This step extracts raster values at each station (depicted by its latitude and longitude) and stores them as a table.
+The 'melt' function converts the data from a wide to long table format
+ 
+```{r, warning=FALSE, message=FALSE}
+
+cruprdf<-as.data.frame(cruprmalawi, xy=TRUE, na.rm=TRUE)%>% 
+  melt(id.vars=c('x','y'))
+```
+
+### Format data with proper date column and change column labels
+The time variable in our data is stored as a character and the step below is to extract the dates from this variable and store them in a new column/variable.
+We also, create two more columns to separate Year and Month
+
+```{r, warning=FALSE, message=FALSE}
+
+Date<-substr(cruprdf$variable, 2,11) # extract date values from df
+cruprdf$Date<-Date # add date column to df
+Year<-substr(Date,1,4)
+Month<-substr(Date,6,7)
+cruprdf<-cbind(cruprdf, Year, Month)
+
+colnames(cruprdf)[colnames(cruprdf)=="value"]<-"pr"  # change column label
+
+```
+
+### Plot Monthly data
+Our data is now ready for some statistical analysis.
+we may plot monthly data as below;
++ Install and load package 'ggplot2'
++ Call the function 'ggplot' and enter data to plot
++ Specify the aesthetic values in the order x,y
++ Call the function 'geom_line' and specify parameters as necessary.
++ Specify labels for your x and y axis and add a title for your plot.
++ You may optionally add a theme. Play with the themes to see which suits you better.
+
+```{r, warning=FALSE, message=FALSE}
+
+ggplot(cruprdf, aes(Date,pr))+
+  geom_line(col='blue')+
+  xlab('Time')+ylab('pr (mm)')+
+  ggtitle('Monthly Precipitation')+
+  theme_bw()
+
+```
+
+### Monthly mean time series
+or as a time series as in below;
++ First, group the data by months
++ Summarize the data by mean values for each month
++ Convert the summarized data into a  timeseries object
++ Plot timeseries object
+ 
+```{r warning=FALSE, message=FALSE}
+
+pr_monthly<-cruprdf%>% group_by(Month)%>%
+  summarise(across(contains("pr"), ~mean(pr, na.rm=TRUE))) 
+pr_monthly$Month<-factor(pr_monthly$Month,levels = c('6','7','8','9','10','11','12','1','2','3','4','5')) # reorder the months to start plotting from June to January
+
+tsprmon<- ts(pr_monthly$pr)
+
+plot(tsprmon)
+```
+
+
+### Annual mean time series
+or the annual mean values as below;
++ First, group the data by years
++ Summarize the data by mean values for each year
++ Convert the summarized data into a  timeseries object
++ Plot timeseries object
+
+```{r, warning=FALSE, message=FALSE}
+
+pr_ann<-cruprdf%>% group_by(Year)%>% 
+  summarise(across(contains("pr"), ~mean(pr, na.rm=TRUE)))
+tsprann<- ts(pr_ann$pr,start= 1901,frequency = 1)
+plot(tsprann)
+```
+
+## CMIP6 historical and scenario data
+
+1. Climate scenario data can be accessed from any of the following sites;
++ [USA, PCMDI/LLNL (California)](https://esgf-node.llnl.gov/projects/cmip6/)
++ [France, IPSL](https://esgf-node.ipsl.upmc.fr/projects/cmip6-ipsl/)
++ [Germany, DKRZ](https://esgf-data.dkrz.de/projects/cmip6-dkrz/)
++ [UK, CEDA](https://esgf-index1.ceda.ac.uk/projects/cmip6-ceda/)
+2. To download data, please create an account and navigate to the search menu
+3. There are more than a dozen parameters to consider. It helps if you are specific in your requirements. To get the data used in this exercise, we will use the parameters as in this snapshot: ![CMIP6_Params](C:\Workspace\RMardown_NAPS\Guide\Snapshots\CMIP6_Params.jpg)
+4. Ensure the downloaded files are in your working directory otherwise, when loading them into r, use the full path to their directory location
+5. Historical data can be accessed with same parameters as above, except for 'Activity' which changess to 'CMIP6' and 'Experiment ID' which changes to 'historical'. See screenshot ![CMIP6_Params_hist](C:\Workspace\RMardown_NAPS\Guide\Snapshots\CMIP6_Params_hist.jpg)
+
+
+### Load your downloaded.nc files
+1. Call the 'raster' library
+2. Create object names for your data and load the files as in code below. # remember to use full path if the working directory is not the same as your file location
+3. Run code
+
+```{r}
+
+prmiroc126<-stack("pr_Amon_MIROC-ES2L_ssp126_r1i1p1f2_gn_201501-210012.nc")
+prmiroc245<-stack("pr_Amon_MIROC-ES2L_ssp245_r1i1p1f2_gn_201501-210012.nc")
+prmiroc585<-stack("pr_Amon_MIROC-ES2L_ssp585_r1i1p1f2_gn_201501-210012 .nc")
+prmirochist<-stack("pr_Amon_MIROC-ES2L_historical_r1i1p1f2_gn_185001-201412.nc")
+
+```
+
+### get geom boundary from natural earth
+Define your bounding geometry. 
+
+```{r}
+
+Malawi<-ne_countries(country = 'malawi', returnclass = 'sf')
+```
+
+
+### Subset your data
+
+Use the geometry in previous step to subset your data to your area of interest.
+We will use two raster functions 'crop' and 'mask' for this task.
+
+```{r, message=FALSE, warning=FALSE}
+
+prmiroc126Malawi<-crop(prmiroc126, Malawi)
+prmiroc126Malawim<-mask(prmiroc126Malawi, Malawi)
+
+prmiroc245Malawi<-crop(prmiroc245, Malawi)
+prmiroc245Malawim<-mask(prmiroc245Malawi, Malawi)
+
+prmiroc585Malawi<-crop(prmiroc585, Malawi)
+prmiroc585Malawim<-mask(prmiroc585Malawi, Malawi)
+
+prmirochistMalawi<-crop(prmirochist, Malawi)
+prmirochistMalawim<-mask(prmirochistMalawi, Malawi)
+```
+
+### Convert subset raster to data frame
+Convert the subset data into data frame format using the function 'as.data.frame' and the 'melt' function to convert our data frame from a wide table to a long table format
+
+```{r, warning=FALSE, message=FALSE}
+
+dfprmiroc126<-as.data.frame(prmiroc126Malawim, xy=TRUE)%>%
+  melt(id.vars=c('x','y'))%>% na.omit(dfprmiroc126)
+
+dfprmiroc245<-as.data.frame(prmiroc245Malawim, xy=TRUE)%>%
+  melt(id.vars=c('x','y'))%>% na.omit(dfprmiroc245)
+
+dfprmiroc585<-as.data.frame(prmiroc585Malawim, xy=TRUE)%>%
+  melt(id.vars=c('x','y'))%>%
+  na.omit(dfprmiroc585)
+
+dfprmirochist<-as.data.frame(prmirochistMalawim, xy=TRUE)%>%
+  melt(id.vars=c('x','y'))%>%
+  na.omit(dfprmirochist)
+```
+
+
+### Add column 'Trend' to dataframes
+The next step would be to combine the 3 dataframes into one so that we can create plots easily.
+But since the data variables are identical, with no column to distinguish them, we will add a column called 'Trend' to each and populate it with respective values.
+Then combine the 3 dataframes using the base function 'rbind'
+
+````{r, message=FALSE, warning=FALSE}
+Trend<-'ssp126'
+prmiroc1<-cbind(dfprmiroc126,Trend)
+Trend<-'ssp245'
+prmiroc2<-cbind(dfprmiroc245,Trend)
+Trend<-'ssp585'
+prmiroc5<-cbind(dfprmiroc585,Trend)
+Trend<-'historical'
+prmiroch<-cbind(dfprmirochist,Trend)
+prmiroccomb<-rbind(prmiroc1,prmiroc2,prmiroc5, prmiroch)
+```
+
+## Extract and format the date values into as.date
+The time variable in our data is stored as a character and the step below is to extract the dates from this variable and store them in a new column named 'Date'.
+
+
+```{r,results='hide'}
+
+Dt<-prmiroccomb$variable
+str_sub(Dt,-2)
+str_sub(Dt,-5,-4)
+str_sub(Dt,-10,-7)
+paste(str_sub(Dt,-10,-7),str_sub(Dt,-5,-4),str_sub(Dt,-2), sep = "-")
+Date<-as.Date(paste(str_sub(Dt,-10,-7),str_sub(Dt,-5,-4),str_sub(Dt,-2), sep = "-"))
+```
+
+Add the proper Date column to the dataframe using the function 'cbind' 
+
+```{r}
+
+prmiroccombdt<-cbind(prmiroccomb,Date)
+```
+
+Next, extract month and year values and add them as separate columns
+
+
+```{r}
+Year<-substr(Dt,2,5)
+Month<-substr(Dt,7,8)
+Day<-substr(Dt,10,11)
+prmirocdf<-cbind(prmiroccombdt, Year, Month,Day)
+```
+
+Next, rename column 'value' to 'pr'
+
+```{r}
+colnames(prmirocdf)[colnames(prmirocdf)=="value"]<-"pr"
+```
+
+### Plot data as is in line graph
+Call the function 'ggplot2' and enter details as below
+
+```{r, warning=FALSE, message=FALSE}
+
+ggplot(prmirocdf, aes(Date,pr))+
+  geom_line(col='blue')+
+  facet_grid(Trend~.,scales = 'free_x')+
+  #scale_alpha_manual(breaks = 50)+
+  ggtitle('Monthly Precipitation')+
+  theme_bw()
+```
+
+### Plot Annual mean time series
+1. To plot the annual data, first we have to group the data by Trend and year
+2. Then calculate yearly mean form the pr values and feed this data into a plot; we use qplot grom the package 'ggeasy' 
+
+```{r, warning=FALSE, message=FALSE}
+
+prmirocanndat<-prmirocdf%>% group_by(Trend, Year)%>% 
+  summarise(across(contains("pr"), ~mean(pr, na.rm=TRUE)))
+
+qplot(Year, pr, data = prmirocanndat, geom = "line", group = Trend
+      , color= Trend) +
+     #facet_grid(Trend ~ ., scale = "free") +
+     scale_x_discrete() +
+  ggtitle('Annual Precipitation Trend')+
+     easy_rotate_x_labels(angle = 90, side = "right")
+#plotly::ggplotly(myplot)
+```
+
+
+<details style="margin-bottom:10px;">
+<summary>Standard output and standard error</summary>
+`C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Read_Climate_data_reprex_std_out_err.txt`
+</details>
+
+<details style="margin-bottom:10px;">
+<summary>Standard output and standard error</summary>
+`C:/Workspace/RMardown_NAPS/Open-NAPs-Data/opennaps/Read_Climate_data_reprex_reprex_std_out_err.txt`
+</details>
