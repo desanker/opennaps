@@ -13,11 +13,26 @@ knitr::opts_chunk$set(echo = TRUE)
 prpath<-"C:/Workspace/RMardown_NAPS/Testrun1/Open-Naps_Test1/wc2-5/Precipitation/wc2.1_2.5m_prec_2010-2018 - Copy"
 ```
 
+### Load required libraries
+If using r for the first time, you need to install the respective packages fisrt.
+The package names as similar to the libraries.
+
+```{r, warning=FALSE, message=FALSE}
+library(R.utils)
+library(raster)
+library(magrittr)
+library(rnaturalearth)
+library(dplyr)
+library(reshape)
+library(ggplot2)
+library(lubridate)
+library(timeSeries)
+library(stringr)
+```
 
 ### load tif files only
 
 ```{r}
-library(raster)
 pr_tif_only<-list.files(prpath,full.names = TRUE, pattern = ".tif$")
 ```
 
@@ -25,14 +40,12 @@ pr_tif_only<-list.files(prpath,full.names = TRUE, pattern = ".tif$")
 ## stack .tif files (108)
 
 ```{r}
-library(raster)
 prstack<-stack(pr_tif_only)
 ```
 
 ### Get Malawi geom, source: natural earth.org
 
 ```{r, echo=FALSE}
-library(rnaturalearth)
 malawi<-rnaturalearth::ne_countries(country ='malawi', returnclass='sf')
 ```
 
@@ -40,7 +53,6 @@ malawi<-rnaturalearth::ne_countries(country ='malawi', returnclass='sf')
 ### crop for area of interest
 
 ```{r,echo=FALSE, message=FALSE, warning=FALSE}
-library(raster)
 
 wcprmalawi<-crop(prstack,extent(malawi)) ## here you can use your shapefile from previous step or get the bounding coordinates from any map service and enter them in the order (west, east, south, north)
 wcprmalawim<-mask(wcprmalawi,malawi)
@@ -66,9 +78,6 @@ plot(pr_mon_mean)
 ## convert stack to data frame
 
 ```{r}
-library(raster)
-library(reshape)
-library(dplyr)
 prdf<-as.data.frame(pr_mon_mean, xy=TRUE)%>%
   melt(id.vars=c('x','y'))
 
@@ -78,8 +87,6 @@ prdf<-as.data.frame(pr_mon_mean, xy=TRUE)%>%
 ### plot geom raster
 
 ```{r}
-library(ggplot2)
-library(raster)
 ggplot()+
   geom_raster(data=prdf, aes(x=x, y=y, fill=value))+
   facet_wrap(~variable)+
@@ -94,9 +101,6 @@ ggplot()+
 ### select and plot single month
 
 ```{r}
-library(raster)
-library(reshape)
-library(ggplot2)
 xmonthdf<-as.data.frame(pr_mon_mean[[06]], xy=TRUE, stringsAsFactors=FALSE)%>%
   melt(id.vars=c('x','y'))
 ggplot()+
@@ -114,7 +118,6 @@ ggplot()+
 #### first prepare the raw raster data as data frame
 
 ```{r}
-library(reshape)
 stdf_pr<-as.data.frame(wcprmalawim,xy=TRUE, na.rm=TRUE, stringsAsFactors=FALSE)%>%
   melt(id.vars=c('x','y'))
 ```
@@ -132,7 +135,6 @@ prdfdate<-as.Date(paste(substr(Dt,2,5),substr(Dt,7,8),'01', sep = "-"))
 #### add proper date column to your dataframe
 
 ```{r}
-library(lubridate)
 stdf_date<-stdf_pr # created a copy of the df just as extra caution
 Date<-prdfdate # a copy of the date values as extra caution too
 stdfpr_dt<-cbind(stdf_date,Date)
@@ -153,7 +155,6 @@ colnames(stdf_pr)[colnames(stdf_pr)=="value"]<-"pr"
 ```
 
 ```{r}
-library(ggplot2)
 ggplot(stdf_pr, aes(Date,pr))+
   geom_line(col='blue')+
   xlab('Time')+ylab('pr (mm)')+
